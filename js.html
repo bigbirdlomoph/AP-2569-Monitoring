@@ -1,0 +1,280 @@
+<script>
+  var CACHED_OPTIONS = null;
+
+  $(document).ready(function() {
+    loadDashboardData();
+    google.script.run.withSuccessHandler(function(data) { CACHED_OPTIONS = data; }).getSearchOptions();
+  });
+
+  function switchPage(pageId, element) {
+    $('.page-section').addClass('d-none');
+    var target = $('#' + pageId + '-page');
+    if (target.length) target.removeClass('d-none');
+    if(element) { $('.nav-pill-btn').removeClass('active'); $(element).addClass('active'); }
+
+    if (pageId === 'search' && $('#searchDeptSelect option').length <= 1) initSearchPage();
+    if (pageId === 'transaction') {
+       if ($('#txDept option').length <= 1) initTransactionPage();
+       else loadTxHistory();
+    }
+    if (pageId === 'yearly' && $('#yearlyDeptSelect option').length <= 1) initYearlyPage();
+  }
+
+  // DASHBOARD
+  function loadDashboardData() {
+    google.script.run.withSuccessHandler(renderDashboard).getDashboardData();
+  }
+  function renderDashboard(data) {
+    if(data.error) { console.error(data.error); return; }
+    updateCards('moph', data.moph); renderGauge('mophGauge', data.moph); renderBarChart('mophBar', data.moph.deptStats, '#198754'); 
+    updateCards('nonmoph', data.nonMoph); renderGauge('nonMophGauge', data.nonMoph); renderBarChart('nonMophBar', data.nonMoph.deptStats, '#0d6efd'); 
+  }
+  function updateCards(prefix, stats) {
+    var fmt = (num) => Number(num).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    $('#' + prefix + '-approved').text(fmt(stats.approved));
+    $('#' + prefix + '-allocated').text(fmt(stats.allocated));
+    $('#' + prefix + '-spent').text(fmt(stats.spent));
+    $('#' + prefix + '-balance').text(fmt(stats.balance));
+  }
+  function renderGauge(canvasId, stats) {
+    var alloc = stats.allocated || 0;
+    var spent = stats.spent || 0;
+    var percent = alloc > 0 ? (spent / alloc) * 100 : 0;
+    $('#' + canvasId + 'Text').text(percent.toFixed(2) + '%');
+    var chartStatus = Chart.getChart(canvasId); if (chartStatus) chartStatus.destroy();
+    new Chart(document.getElementById(canvasId), {
+      type: 'doughnut',
+      data: { labels: ['เบิกจ่าย', 'คงเหลือ'], datasets: [{ data: [percent, 100 - percent], backgroundColor: ['#dc3545', '#e9ecef'], borderWidth: 0, hoverOffset: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, rotation: -90, circumference: 180, cutout: '80%', plugins: { legend: {display:false}, tooltip: {enabled:false} } }
+    });
+  }
+  function renderBarChart(canvasId, deptStats, colorTheme) {
+    var chartData = [];
+    for (var dept in deptStats) {
+       var alloc = deptStats[dept].allocated;
+       var spent = deptStats[dept].spent;
+       var pct = alloc > 0 ? (spent / alloc) * 100 : 0;
+       if(alloc > 0) chartData.push({ label: dept, y: pct });
+    }
+    chartData.sort((a, b) => b.y - a.y);
+    var chartStatus = Chart.getChart(canvasId); if (chartStatus) chartStatus.destroy();
+    new Chart(document.getElementById(canvasId), {
+      type: 'bar',
+      data: { labels: chartData.map(d => d.label), datasets: [{ data: chartData.map(d => d.y), backgroundColor: colorTheme, borderRadius: 4, barPercentage: 0.6 }] },
+      options: { responsive: true, maintainAspectRatio: false, indexAxis: 'x', plugins: { legend: {display:false}, tooltip: { callbacks: { label: (c) => c.raw.toFixed(2) + '%' } } }, scales: { y: { beginAtZero: true, max: 100, ticks: { callback: (v) => v + "%" } }, x: { grid: {display:false} } } }
+    });
+  }
+
+  // HELPER
+  function populateDropdown(selector, options) {
+    var select = $(selector);
+    select.empty().append('<option value="">-- แสดงทั้งหมด --</option>');
+    options.forEach(function(dept) { select.append(`<option value="${dept}">${dept}</option>`); });
+  }
+
+  // SEARCH (Timeline updated to Quarterly Grid)
+  function initSearchPage() {
+    if (CACHED_OPTIONS) { populateDropdown('#searchDeptSelect', CACHED_OPTIONS); } 
+    else { google.script.run.withSuccessHandler(function(options) { CACHED_OPTIONS = options; populateDropdown('#searchDeptSelect', options); }).getSearchOptions(); }
+  }
+  function runSearch() {
+    var dept = $('#searchDeptSelect').val();
+    $('#searchTableBody').html('<tr><td colspan="8" class="text-center py-4 text-muted"><i class="fas fa-spinner fa-spin me-2"></i>กำลังค้นหาข้อมูล...</td></tr>');
+    google.script.run.withSuccessHandler(renderSearchPage).searchActionPlan(dept);
+  }
+  function resetSearch() {
+    $('#searchDeptSelect').val('');
+    $('#sum-count').text('0'); $('#sum-approved').text('0.00'); $('#sum-allocated').text('0.00');
+    if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().destroy(); }
+    $('#searchTableBody').empty().html('<tr><td colspan="8" class="text-center py-5 text-muted"><i class="fas fa-search fa-2x mb-2 opacity-50"></i><br>กรุณาเลือกกลุ่มงานและกดค้นหา</td></tr>');
+  }
+  function renderSearchPage(data) {
+    if(data.error) { $('#searchTableBody').html('<tr><td colspan="8" class="text-center text-danger">Error: '+ data.error +'</td></tr>'); return; }
+    var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    $('#sum-count').text(Number(data.summary.count).toLocaleString());
+    $('#sum-approved').text(fmt(data.summary.approved));
+    $('#sum-allocated').text(fmt(data.summary.allocated));
+    if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().destroy(); }
+    var tbody = $('#searchTableBody'); tbody.empty();
+    if (data.list.length === 0) { tbody.html('<tr><td colspan="8" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>'); return; }
+    
+    var months = ['ต.ค.','พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.'];
+    data.list.forEach(function(row) {
+      // Create Quarterly Grid for Timeline
+      var timelineHtml = '<div style="font-size: 0.7rem;">';
+      
+      // Loop ทุก 3 เดือน (ไตรมาส)
+      for(let i=0; i<12; i+=3) {
+         let rowHtml = '';
+         let hasActive = false;
+         for(let j=0; j<3; j++) {
+            let idx = i+j;
+            if(row.timeline[idx]) {
+                rowHtml += `<span class="badge bg-success fw-normal me-1 mb-1">${months[idx]}</span>`;
+                hasActive = true;
+            }
+         }
+         // ถ้าไตรมาสนั้นมีข้อมูล ให้แสดงบรรทัดนั้น
+         if(hasActive) { timelineHtml += `<div class="mb-1">${rowHtml}</div>`; }
+      }
+      if(timelineHtml === '<div style="font-size: 0.7rem;">') timelineHtml += '-'; // ถ้าไม่มีข้อมูลเลย
+      timelineHtml += '</div>';
+
+      tbody.append(`
+        <tr>
+          <td class="ps-3">${row.order}</td>
+          <td><span class="badge bg-light text-dark border">${row.dept}</span></td>
+          <td>
+             <div class="fw-bold">${row.project}</div>
+             <div class="small text-muted">${row.activity}</div>
+          </td>
+          <td><span class="badge bg-secondary fw-normal">${row.budgetType}</span></td>
+          <td><span class="badge bg-info text-dark fw-normal">${row.budgetSource}</span></td>
+          <td class="text-center">${timelineHtml}</td>
+          <td class="text-end text-primary">${fmt(row.approved)}</td>
+          <td class="text-end fw-bold text-success">${fmt(row.allocated)}</td>
+        </tr>
+      `);
+    });
+    $('#searchTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] });
+  }
+
+  // YEARLY PLAN (Timeline updated to Quarterly Grid)
+  function initYearlyPage() {
+    if (CACHED_OPTIONS) { populateDropdown('#yearlyDeptSelect', CACHED_OPTIONS); } 
+    else { google.script.run.withSuccessHandler(function(options) { CACHED_OPTIONS = options; populateDropdown('#yearlyDeptSelect', options); }).getSearchOptions(); }
+  }
+  function loadYearlyData() {
+    var dept = $('#yearlyDeptSelect').val();
+    $('#yearlyTableBody').html('<tr><td colspan="9" class="text-center py-5 text-muted"><i class="fas fa-spinner fa-spin fa-2x mb-3"></i><br>กำลังประมวลผลข้อมูล...</td></tr>');
+    google.script.run.withSuccessHandler(renderYearlyPage).getYearlyPlanData(dept);
+  }
+  function resetYearly() {
+    $('#yearlyDeptSelect').val('');
+    $('#yp-count').text('0'); $('#yp-alloc').text('0.00'); $('#yp-spent').text('0.00');
+    if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().destroy(); }
+    $('#yearlyTableBody').empty().html('<tr><td colspan="9" class="text-center py-5 text-muted"><i class="fas fa-filter fa-2x mb-2 opacity-50"></i><br>กรุณาเลือกกลุ่มงานเพื่อดูข้อมูล</td></tr>');
+  }
+  function renderYearlyPage(data) {
+    if(data.error) { $('#yearlyTableBody').html('<tr><td colspan="9" class="text-center text-danger">'+data.error+'</td></tr>'); return; }
+    var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    $('#yp-count').text(Number(data.summary.projects).toLocaleString());
+    $('#yp-alloc').text(fmt(data.summary.allocated));
+    $('#yp-spent').text(fmt(data.summary.spent));
+    if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().destroy(); }
+    var tbody = $('#yearlyTableBody'); tbody.empty();
+    if (data.list.length === 0) { tbody.html('<tr><td colspan="9" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>'); return; }
+    
+    var months = ['ต.ค.','พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.'];
+    data.list.forEach(row => {
+        // Create Quarterly Grid for Timeline
+        var timelineHtml = '<div style="font-size: 0.7rem;">';
+        
+        // Loop ทุก 3 เดือน (ไตรมาส)
+        for(let i=0; i<12; i+=3) {
+           let rowHtml = '';
+           let hasActive = false;
+           for(let j=0; j<3; j++) {
+              let idx = i+j;
+              if(row.timeline[idx]) {
+                  rowHtml += `<span class="badge bg-success fw-normal me-1 mb-1">${months[idx]}</span>`;
+                  hasActive = true;
+              }
+           }
+           // ถ้าไตรมาสนั้นมีข้อมูล ให้แสดงบรรทัดนั้น
+           if(hasActive) { timelineHtml += `<div class="mb-1">${rowHtml}</div>`; }
+        }
+        if(timelineHtml === '<div style="font-size: 0.7rem;">') timelineHtml += '-'; // ถ้าไม่มีข้อมูลเลย
+        timelineHtml += '</div>';
+        
+        // 9 Columns now (Added Budget Source)
+        tbody.append(`
+          <tr>
+            <td class="ps-3">${row.order}</td>
+            <td><span class="badge bg-light text-dark border">${row.dept}</span></td>
+            <td>
+               <div class="fw-bold text-wrap" style="font-size: 1rem;">${row.project}</div>
+               <div class="small text-muted mt-1"><i class="fas fa-tasks me-1"></i>${row.activity}</div>
+            </td>
+            <td><span class="badge bg-secondary fw-normal">${row.type}</span></td>
+            <td><span class="badge bg-info text-dark fw-normal">${row.budgetSource}</span></td>
+            <td class="text-center">${timelineHtml}</td>
+            <td class="text-end">${fmt(row.allocated)}</td>
+            <td class="text-end">${fmt(row.spent)}</td>
+            <td class="text-end pe-3 fw-bold ${row.balance < 0 ? 'text-danger':'text-success'}">${fmt(row.balance)}</td>
+          </tr>
+        `);
+    });
+    $('#yearlyTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] });
+  }
+
+  // TRANSACTION
+  function initTransactionPage() {
+    document.getElementById('txDate').valueAsDate = new Date();
+    google.script.run.withSuccessHandler(function(list) {
+      var select = $('#txDept');
+      select.empty().append('<option value="">-- เลือกกลุ่มงาน --</option>');
+      list.forEach(item => select.append(`<option value="${item}">${item}</option>`));
+    }).getTxOptions('dept');
+    loadTxHistory();
+  }
+  function loadTxProjects() {
+    var dept = $('#txDept').val();
+    var select = $('#txProject');
+    select.prop('disabled', true).empty().append('<option value="">กำลังโหลด...</option>');
+    $('#txActivity').prop('disabled', true).empty().append('<option value="">-- เลือกกิจกรรม --</option>');
+    $('#budgetInfoBox').addClass('d-none');
+    if(!dept) return;
+    google.script.run.withSuccessHandler(function(list) {
+      select.empty().append('<option value="">-- เลือกโครงการ --</option>');
+      list.forEach(item => select.append(`<option value="${item}">${item}</option>`));
+      select.prop('disabled', false);
+    }).getTxOptions('project', dept);
+  }
+  function loadTxActivities() {
+    var project = $('#txProject').val();
+    var select = $('#txActivity');
+    select.prop('disabled', true).empty().append('<option value="">กำลังโหลด...</option>');
+    $('#budgetInfoBox').addClass('d-none');
+    if(!project) return;
+    google.script.run.withSuccessHandler(function(list) {
+      select.empty().append('<option value="">-- เลือกกิจกรรม --</option>');
+      list.forEach(item => { select.append(`<option value="${item.name}" data-alloc="${item.allocated}" data-bal="${item.balance}">${item.name}</option>`); });
+      select.prop('disabled', false);
+    }).getTxOptions('activity', project);
+  }
+  function showBudgetInfo() {
+    var opt = $('#txActivity option:selected');
+    if (opt.data('alloc') != undefined) {
+      $('#infoAlloc').text(Number(opt.data('alloc')).toLocaleString());
+      $('#infoBal').text(Number(opt.data('bal')).toLocaleString());
+      $('#budgetInfoBox').removeClass('d-none');
+    } else { $('#budgetInfoBox').addClass('d-none'); }
+  }
+  function submitTransaction() {
+    var amount = parseFloat($('#txAmount').val());
+    if (amount <= 0) { Swal.fire('แจ้งเตือน', 'กรุณาระบุยอดเงิน', 'warning'); return; }
+    var formData = { dept: $('#txDept').val(), project: $('#txProject').val(), activity: $('#txActivity').val(), txDate: $('#txDate').val(), amount: amount, expenseType: $('#txExpenseType').val(), desc: $('#txDesc').val() };
+    $('#btnSaveTx').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>กำลังบันทึก...');
+    google.script.run.withSuccessHandler(function(res) {
+      $('#btnSaveTx').prop('disabled', false).html('<i class="fas fa-save me-2"></i>บันทึกและตัดยอด');
+      if (res.status === 'success') {
+        Swal.fire('สำเร็จ', res.message, 'success');
+        $('#txForm')[0].reset(); $('#txProject').prop('disabled', true); $('#txActivity').prop('disabled', true); $('#budgetInfoBox').addClass('d-none');
+        document.getElementById('txDate').valueAsDate = new Date();
+        loadTxHistory();
+      } else { Swal.fire('Error', res.message, 'error'); }
+    }).saveTransaction(formData);
+  }
+  function loadTxHistory() {
+    google.script.run.withSuccessHandler(function(rows) {
+      var tbody = $('#txHistoryTable'); tbody.empty();
+      if (rows.length === 0) { tbody.append('<tr><td colspan="4" class="text-center text-muted py-3">ยังไม่มีรายการ</td></tr>'); return; }
+      rows.forEach(r => {
+        var d = new Date(r[1]).toLocaleDateString('th-TH');
+        var amt = Number(r[7]).toLocaleString();
+        tbody.append(`<tr><td class="ps-3 text-nowrap">${d}</td><td><div class="text-truncate" style="max-width: 150px;">${r[4]}</div></td><td><div class="text-truncate" style="max-width: 150px;">${r[6]}</div></td><td class="text-end pe-3 fw-bold text-danger">-${amt}</td></tr>`);
+      });
+    }).getTransactionHistory();
+  }
+</script>
