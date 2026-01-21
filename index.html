@@ -41,6 +41,7 @@
         <h3 class="fw-bold text-dark"><i class="fas fa-chart-bar me-2 text-secondary"></i>Dashboard Action Plan 2569 Monitoring</h3>
         <p class="text-muted small">สถานการณ์เบิกจ่ายงบประมาณ สำนักงานสาธารณสุขจังหวัดเลย</p>
       </div>
+      
       <div class="section-title text-success">งบประมาณใน สป.สธ.</div>
       <div class="row g-3 mb-4">
         <div class="col-md-6 col-xl-3"><div class="card-metric bg-blue"><div class="card-label">อนุมัติตามแผน</div><div class="card-value" id="moph-approved">Loading...</div><i class="fas fa-file-invoice-dollar card-icon"></i></div></div>
@@ -48,14 +49,29 @@
         <div class="col-md-6 col-xl-3"><div class="card-metric bg-red"><div class="card-label">เบิกจ่าย</div><div class="card-value" id="moph-spent">Loading...</div><i class="fas fa-times-circle card-icon"></i></div></div>
         <div class="col-md-6 col-xl-3"><div class="card-metric bg-yellow"><div class="card-label text-dark">คงเหลือ</div><div class="card-value text-dark" id="moph-balance">Loading...</div><i class="fas fa-minus-circle card-icon text-dark"></i></div></div>
       </div>
-      <div class="card border-0 shadow-sm rounded-4 mb-5">
-        <div class="card-body p-4 text-center">
-            <div class="gauge-wrapper mx-auto"><canvas id="mophGauge"></canvas><div class="gauge-text" id="mophGaugeText">0.00%</div></div>
-            <hr class="my-4 opacity-25">
-            <h6 class="fw-bold text-success mb-3">ร้อยละการเบิกจ่าย งบประมาณใน สป.สธ.</h6>
-            <div style="height: 300px;"><canvas id="mophBar"></canvas></div>
+      
+      <div class="row g-3 mb-5">
+        <div class="col-lg-4">
+           <div class="card border-0 shadow-sm h-100 rounded-4">
+             <div class="card-body p-4 text-center">
+                <h6 class="fw-bold text-muted mb-3">ภาพรวมการเบิกจ่าย</h6>
+                <div class="gauge-wrapper mx-auto" style="height: 250px;">
+                   <canvas id="mophGauge"></canvas>
+                   <div class="gauge-text" id="mophGaugeText">0.00%</div>
+                </div>
+             </div>
+           </div>
+        </div>
+        <div class="col-lg-8">
+           <div class="card border-0 shadow-sm h-100 rounded-4">
+             <div class="card-body p-4">
+                <h6 class="fw-bold text-success mb-3">ร้อยละการเบิกจ่าย จำแนกตามกลุ่มงาน (เรียงมาก-น้อย)</h6>
+                <div style="height: 300px;"><canvas id="mophBar"></canvas></div>
+             </div>
+           </div>
         </div>
       </div>
+
       <div class="section-title text-success">งบประมาณเงินนอก สป.</div>
       <div class="row g-3 mb-4">
         <div class="col-md-6 col-xl-3"><div class="card-metric bg-blue"><div class="card-label">อนุมัติตามแผน</div><div class="card-value" id="nonmoph-approved">...</div><i class="fas fa-file-invoice-dollar card-icon"></i></div></div>
@@ -63,12 +79,26 @@
         <div class="col-md-6 col-xl-3"><div class="card-metric bg-red"><div class="card-label">เบิกจ่าย</div><div class="card-value" id="nonmoph-spent">...</div><i class="fas fa-times-circle card-icon"></i></div></div>
         <div class="col-md-6 col-xl-3"><div class="card-metric bg-yellow"><div class="card-label text-dark">คงเหลือ</div><div class="card-value text-dark" id="nonmoph-balance">...</div><i class="fas fa-minus-circle card-icon text-dark"></i></div></div>
       </div>
-      <div class="card border-0 shadow-sm rounded-4 mb-5">
-        <div class="card-body p-4 text-center">
-            <div class="gauge-wrapper mx-auto"><canvas id="nonMophGauge"></canvas><div class="gauge-text text-danger" id="nonMophGaugeText">0.00%</div></div>
-            <hr class="my-4 opacity-25">
-            <h6 class="fw-bold text-success mb-3">ร้อยละการเบิกจ่าย งบประมาณเงินนอก สป.</h6>
-            <div style="height: 300px;"><canvas id="nonMophBar"></canvas></div>
+
+      <div class="row g-3 mb-5">
+        <div class="col-lg-4">
+           <div class="card border-0 shadow-sm h-100 rounded-4">
+             <div class="card-body p-4 text-center">
+                <h6 class="fw-bold text-muted mb-3">ภาพรวมการเบิกจ่าย</h6>
+                <div class="gauge-wrapper mx-auto" style="height: 250px;">
+                   <canvas id="nonMophGauge"></canvas>
+                   <div class="gauge-text text-danger" id="nonMophGaugeText">0.00%</div>
+                </div>
+             </div>
+           </div>
+        </div>
+        <div class="col-lg-8">
+           <div class="card border-0 shadow-sm h-100 rounded-4">
+             <div class="card-body p-4">
+                <h6 class="fw-bold text-success mb-3">ร้อยละการเบิกจ่าย จำแนกตามกลุ่มงาน (เรียงมาก-น้อย)</h6>
+                <div style="height: 300px;"><canvas id="nonMophBar"></canvas></div>
+             </div>
+           </div>
         </div>
       </div>
     </div>
