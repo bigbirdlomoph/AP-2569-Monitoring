@@ -1,4 +1,4 @@
-Vsersion : 690121-1515
+Vsersion : 690121-1548
 ความสามารถ:
 ✅ Dashboard: สรุปภาพรวมแบบ Real-time
 ✅ สืบค้นแผนปฏิบัติ: ค้นหาข้อมูลละเอียด พร้อม Timeline รายไตรมาส
@@ -6,7 +6,9 @@ Vsersion : 690121-1515
 ✅ บันทึกรายการเบิกจ่าย: ตัดยอดงบประมาณจริง Coming soon...
 
 Dashboard
-<img width="1848" height="1988" alt="image" src="https://github.com/user-attachments/assets/aa9cdee9-c29a-4007-9e9e-c0158f5e3d13" />
+<img width="1856" height="909" alt="image" src="https://github.com/user-attachments/assets/96e47af6-0cea-4103-8c18-9b11dbbde825" />
+<img width="1848" height="909" alt="image" src="https://github.com/user-attachments/assets/737b8ff9-3b4c-4d96-aedc-9ebe4f19bdb6" />
+
 
 สืบค้นแผนปฏิบัติ
 <img width="1870" height="910" alt="image" src="https://github.com/user-attachments/assets/bffe247d-475d-4d59-9ec9-659a954010b5" />
