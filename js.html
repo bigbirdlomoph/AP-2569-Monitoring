@@ -100,10 +100,8 @@
     
     var months = ['ต.ค.','พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.'];
     data.list.forEach(function(row) {
-      // Create Quarterly Grid for Timeline
+      // Create Quarterly Grid
       var timelineHtml = '<div style="font-size: 0.7rem;">';
-      
-      // Loop ทุก 3 เดือน (ไตรมาส)
       for(let i=0; i<12; i+=3) {
          let rowHtml = '';
          let hasActive = false;
@@ -114,10 +112,9 @@
                 hasActive = true;
             }
          }
-         // ถ้าไตรมาสนั้นมีข้อมูล ให้แสดงบรรทัดนั้น
          if(hasActive) { timelineHtml += `<div class="mb-1">${rowHtml}</div>`; }
       }
-      if(timelineHtml === '<div style="font-size: 0.7rem;">') timelineHtml += '-'; // ถ้าไม่มีข้อมูลเลย
+      if(timelineHtml === '<div style="font-size: 0.7rem;">') timelineHtml += '-'; 
       timelineHtml += '</div>';
 
       tbody.append(`
@@ -125,7 +122,7 @@
           <td class="ps-3">${row.order}</td>
           <td><span class="badge bg-light text-dark border">${row.dept}</span></td>
           <td>
-             <div class="fw-bold">${row.project}</div>
+             <div class="fw-bold text-wrap">${row.project}</div>
              <div class="small text-muted">${row.activity}</div>
           </td>
           <td><span class="badge bg-secondary fw-normal">${row.budgetType}</span></td>
@@ -139,7 +136,7 @@
     $('#searchTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] });
   }
 
-  // YEARLY PLAN (Timeline updated to Quarterly Grid)
+  // YEARLY PLAN (Same Logic)
   function initYearlyPage() {
     if (CACHED_OPTIONS) { populateDropdown('#yearlyDeptSelect', CACHED_OPTIONS); } 
     else { google.script.run.withSuccessHandler(function(options) { CACHED_OPTIONS = options; populateDropdown('#yearlyDeptSelect', options); }).getSearchOptions(); }
@@ -167,10 +164,8 @@
     
     var months = ['ต.ค.','พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.'];
     data.list.forEach(row => {
-        // Create Quarterly Grid for Timeline
+        // Quarterly Grid
         var timelineHtml = '<div style="font-size: 0.7rem;">';
-        
-        // Loop ทุก 3 เดือน (ไตรมาส)
         for(let i=0; i<12; i+=3) {
            let rowHtml = '';
            let hasActive = false;
@@ -181,13 +176,11 @@
                   hasActive = true;
               }
            }
-           // ถ้าไตรมาสนั้นมีข้อมูล ให้แสดงบรรทัดนั้น
            if(hasActive) { timelineHtml += `<div class="mb-1">${rowHtml}</div>`; }
         }
-        if(timelineHtml === '<div style="font-size: 0.7rem;">') timelineHtml += '-'; // ถ้าไม่มีข้อมูลเลย
+        if(timelineHtml === '<div style="font-size: 0.7rem;">') timelineHtml += '-'; 
         timelineHtml += '</div>';
         
-        // 9 Columns now (Added Budget Source)
         tbody.append(`
           <tr>
             <td class="ps-3">${row.order}</td>
