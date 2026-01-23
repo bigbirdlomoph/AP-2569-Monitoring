@@ -6,20 +6,29 @@
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css"/>
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
   <?!= include('css'); ?>
 </head>
 <body class="d-flex flex-column min-vh-100">
 
   <nav class="navbar navbar-expand-lg navbar-custom sticky-top shadow-sm">
     <div class="container-fluid px-4">
-      <div class="d-flex align-items-center">
-        <span class="navbar-brand mb-0 h1">AP 2569 MONITORING</span>
+      <div class="d-flex flex-column">
+         <span class="navbar-brand mb-0 h1 lh-1">AP 2569 MONITORING</span>
+         <small class="text-white-50" style="font-size: 0.65rem; letter-spacing: 1px;">Version: <?= appVersion ?></small>
       </div>
-      <div class="d-flex d-none d-lg-flex">
+      <div class="d-flex d-none d-lg-flex ms-4">
         <a href="javascript:void(0)" class="nav-pill-btn active" onclick="switchPage('dashboard', this)">Dashboard</a>
         <a href="javascript:void(0)" class="nav-pill-btn" onclick="switchPage('search', this)">สืบค้นแผนปฏิบัติ</a>
         <a href="javascript:void(0)" class="nav-pill-btn" onclick="switchPage('yearly', this)">แผนงานประจำปี</a>
-        <a href="javascript:void(0)" class="nav-pill-btn" onclick="switchPage('transaction', this)">บันทึกรายการเบิกจ่าย</a>
+        <div class="dropdown ms-2">
+          <a class="nav-pill-btn dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">ธุรกรรม</a>
+          <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
+            <li><a class="dropdown-item" href="javascript:void(0)" onclick="switchPage('transaction')"><i class="fas fa-file-invoice-dollar me-2 text-success"></i>บันทึกรายการเบิกจ่าย</a></li>
+            <li><a class="dropdown-item" href="javascript:void(0)" onclick="switchPage('loan')"><i class="fas fa-hand-holding-usd me-2 text-primary"></i>บันทึกรายการเงินยืม</a></li>
+          </ul>
+        </div>
       </div>
       <button class="navbar-toggler text-white border-0" type="button" data-bs-toggle="collapse" data-bs-target="#mobileMenu">
         <i class="fas fa-bars"></i>
@@ -31,17 +40,15 @@
       <a href="javascript:void(0)" class="d-block text-white py-2 text-decoration-none" onclick="switchPage('dashboard')">Dashboard</a>
       <a href="javascript:void(0)" class="d-block text-white py-2 text-decoration-none" onclick="switchPage('search')">สืบค้นแผนปฏิบัติ</a>
       <a href="javascript:void(0)" class="d-block text-white py-2 text-decoration-none" onclick="switchPage('yearly')">แผนงานประจำปี</a>
-      <a href="javascript:void(0)" class="d-block text-white py-2 text-decoration-none" onclick="switchPage('transaction')">บันทึกรายการเบิกจ่าย</a>
+      <hr class="text-white-50">
+      <a href="javascript:void(0)" class="d-block text-white py-2 text-decoration-none" onclick="switchPage('transaction')">บันทึกเบิกจ่าย</a>
+      <a href="javascript:void(0)" class="d-block text-white py-2 text-decoration-none" onclick="switchPage('loan')">บันทึกเงินยืม</a>
   </div>
 
   <div class="container-fluid mt-4 mb-5 px-lg-5 flex-grow-1">
     
     <div id="dashboard-page" class="page-section fade-in">
-      <div class="mb-4">
-        <h3 class="fw-bold text-dark"><i class="fas fa-chart-bar me-2 text-secondary"></i>Dashboard Action Plan 2569 Monitoring</h3>
-        <p class="text-muted small">สถานการณ์เบิกจ่ายงบประมาณ สำนักงานสาธารณสุขจังหวัดเลย</p>
-      </div>
-      
+      <div class="mb-4"><h3 class="fw-bold text-dark"><i class="fas fa-chart-bar me-2 text-secondary"></i>Dashboard Action Plan 2569 Monitoring</h3></div>
       <div class="section-title text-success">งบประมาณใน สป.สธ.</div>
       <div class="row g-3 mb-4">
         <div class="col-md-6 col-xl-3"><div class="card-metric bg-blue"><div class="card-label">อนุมัติตามแผน</div><div class="card-value" id="moph-approved">Loading...</div><i class="fas fa-file-invoice-dollar card-icon"></i></div></div>
@@ -49,29 +56,10 @@
         <div class="col-md-6 col-xl-3"><div class="card-metric bg-red"><div class="card-label">เบิกจ่าย</div><div class="card-value" id="moph-spent">Loading...</div><i class="fas fa-times-circle card-icon"></i></div></div>
         <div class="col-md-6 col-xl-3"><div class="card-metric bg-yellow"><div class="card-label text-dark">คงเหลือ</div><div class="card-value text-dark" id="moph-balance">Loading...</div><i class="fas fa-minus-circle card-icon text-dark"></i></div></div>
       </div>
-      
       <div class="row g-3 mb-5">
-        <div class="col-lg-4">
-           <div class="card border-0 shadow-sm h-100 rounded-4">
-             <div class="card-body p-4 text-center">
-                <h6 class="fw-bold text-muted mb-3">ภาพรวมการเบิกจ่าย</h6>
-                <div class="gauge-wrapper mx-auto" style="height: 250px;">
-                   <canvas id="mophGauge"></canvas>
-                   <div class="gauge-text" id="mophGaugeText">0.00%</div>
-                </div>
-             </div>
-           </div>
-        </div>
-        <div class="col-lg-8">
-           <div class="card border-0 shadow-sm h-100 rounded-4">
-             <div class="card-body p-4">
-                <h6 class="fw-bold text-success mb-3">ร้อยละการเบิกจ่าย จำแนกตามกลุ่มงาน (เรียงมาก-น้อย)</h6>
-                <div style="height: 300px;"><canvas id="mophBar"></canvas></div>
-             </div>
-           </div>
-        </div>
+        <div class="col-lg-4"><div class="card border-0 shadow-sm h-100 rounded-4"><div class="card-body p-4 text-center"><h6 class="fw-bold text-muted mb-3">ภาพรวมการเบิกจ่าย</h6><div class="gauge-wrapper mx-auto" style="height: 250px;"><canvas id="mophGauge"></canvas><div class="gauge-text" id="mophGaugeText">0.00%</div></div></div></div></div>
+        <div class="col-lg-8"><div class="card border-0 shadow-sm h-100 rounded-4"><div class="card-body p-4"><h6 class="fw-bold text-success mb-3">ร้อยละการเบิกจ่าย จำแนกตามกลุ่มงาน (เรียงมาก-น้อย)</h6><div style="height: 300px;"><canvas id="mophBar"></canvas></div></div></div></div>
       </div>
-
       <div class="section-title text-success">งบประมาณเงินนอก สป.</div>
       <div class="row g-3 mb-4">
         <div class="col-md-6 col-xl-3"><div class="card-metric bg-blue"><div class="card-label">อนุมัติตามแผน</div><div class="card-value" id="nonmoph-approved">...</div><i class="fas fa-file-invoice-dollar card-icon"></i></div></div>
@@ -79,170 +67,138 @@
         <div class="col-md-6 col-xl-3"><div class="card-metric bg-red"><div class="card-label">เบิกจ่าย</div><div class="card-value" id="nonmoph-spent">...</div><i class="fas fa-times-circle card-icon"></i></div></div>
         <div class="col-md-6 col-xl-3"><div class="card-metric bg-yellow"><div class="card-label text-dark">คงเหลือ</div><div class="card-value text-dark" id="nonmoph-balance">...</div><i class="fas fa-minus-circle card-icon text-dark"></i></div></div>
       </div>
-
       <div class="row g-3 mb-5">
-        <div class="col-lg-4">
-           <div class="card border-0 shadow-sm h-100 rounded-4">
-             <div class="card-body p-4 text-center">
-                <h6 class="fw-bold text-muted mb-3">ภาพรวมการเบิกจ่าย</h6>
-                <div class="gauge-wrapper mx-auto" style="height: 250px;">
-                   <canvas id="nonMophGauge"></canvas>
-                   <div class="gauge-text text-danger" id="nonMophGaugeText">0.00%</div>
-                </div>
-             </div>
-           </div>
-        </div>
-        <div class="col-lg-8">
-           <div class="card border-0 shadow-sm h-100 rounded-4">
-             <div class="card-body p-4">
-                <h6 class="fw-bold text-success mb-3">ร้อยละการเบิกจ่าย จำแนกตามกลุ่มงาน (เรียงมาก-น้อย)</h6>
-                <div style="height: 300px;"><canvas id="nonMophBar"></canvas></div>
-             </div>
-           </div>
-        </div>
+        <div class="col-lg-4"><div class="card border-0 shadow-sm h-100 rounded-4"><div class="card-body p-4 text-center"><h6 class="fw-bold text-muted mb-3">ภาพรวมการเบิกจ่าย</h6><div class="gauge-wrapper mx-auto" style="height: 250px;"><canvas id="nonMophGauge"></canvas><div class="gauge-text text-danger" id="nonMophGaugeText">0.00%</div></div></div></div></div>
+        <div class="col-lg-8"><div class="card border-0 shadow-sm h-100 rounded-4"><div class="card-body p-4"><h6 class="fw-bold text-success mb-3">ร้อยละการเบิกจ่าย จำแนกตามกลุ่มงาน (เรียงมาก-น้อย)</h6><div style="height: 300px;"><canvas id="nonMophBar"></canvas></div></div></div></div>
       </div>
     </div>
 
     <div id="search-page" class="page-section d-none fade-in">
-      <div class="mb-4">
-        <h3 class="fw-bold text-dark"><i class="fas fa-search me-2 text-secondary"></i>ระบบสืบค้นแผนปฏิบัติ</h3>
-        <p class="text-muted small">ค้นหาข้อมูลโครงการและงบประมาณตามกลุ่มงาน</p>
-      </div>
-      <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body bg-light rounded-3">
-          <form id="searchForm" onsubmit="event.preventDefault(); runSearch();">
-            <div class="row align-items-end">
-              <div class="col-md-6 mb-3 mb-md-0">
-                <label class="form-label fw-bold">เลือกกลุ่มงาน/งาน</label>
-                <select class="form-select" id="searchDeptSelect"><option value="">-- แสดงทั้งหมด --</option></select>
-              </div>
-              <div class="col-md-3 mb-2 mb-md-0">
-                <button type="button" class="btn btn-success w-100" onclick="runSearch()"><i class="fas fa-search me-2"></i>ค้นหา</button>
-              </div>
-              <div class="col-md-3">
-                <button type="button" class="btn btn-secondary w-100" onclick="resetSearch()"><i class="fas fa-undo me-2"></i>ล้างค่า</button>
+        <div class="mb-4"><h3 class="fw-bold text-dark"><i class="fas fa-search me-2 text-secondary"></i>ระบบสืบค้นแผนปฏิบัติ</h3></div>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body bg-light rounded-3">
+              <div class="row align-items-end">
+                <div class="col-md-6 mb-3 mb-md-0"><label class="form-label fw-bold">เลือกกลุ่มงาน/งาน</label><select class="form-select" id="searchDeptSelect"></select></div>
+                <div class="col-md-3 mb-2 mb-md-0"><button class="btn btn-success w-100" onclick="runSearch()">ค้นหา</button></div>
+                <div class="col-md-3"><button class="btn btn-secondary w-100" onclick="resetSearch()">ล้างค่า</button></div>
               </div>
             </div>
-          </form>
         </div>
-      </div>
-      <div class="row g-3 mb-4">
-        <div class="col-md-4"><div class="card-metric bg-primary h-100" style="min-height: 100px;"><div class="d-flex justify-content-between align-items-center"><div><div class="card-label text-white-50">จำนวนโครงการ</div><div class="card-value" id="sum-count">0</div><div class="small text-white-50">โครงการ</div></div><i class="fas fa-layer-group fa-3x text-white-50 opacity-25"></i></div></div></div>
-        <div class="col-md-4"><div class="card-metric bg-blue h-100" style="min-height: 100px;"><div class="d-flex justify-content-between align-items-center"><div><div class="card-label text-white-50">จำนวนขออนุมัติ</div><div class="card-value" id="sum-approved">0.00</div><div class="small text-white-50">บาท</div></div><i class="fas fa-file-invoice-dollar fa-3x text-white-50 opacity-25"></i></div></div></div>
-        <div class="col-md-4"><div class="card-metric bg-green h-100" style="min-height: 100px;"><div class="d-flex justify-content-between align-items-center"><div><div class="card-label text-white-50">จำนวนจัดสรร</div><div class="card-value" id="sum-allocated">0.00</div><div class="small text-white-50">บาท</div></div><i class="fas fa-coins fa-3x text-white-50 opacity-25"></i></div></div></div>
-      </div>
-      <div class="card border-0 shadow-sm">
-        <div class="card-body">
-          <div class="table-responsive">
-            <table id="searchTable" class="table table-hover align-middle w-100">
-              <thead class="table-light">
-                <tr>
-                    <th class="ps-3" style="width: 5%">ลำดับโครงการ</th>
-                    <th style="width: 15%">กลุ่มงาน</th>
-                    <th style="width: 25%">รายการ/กิจกรรม</th>
-                    <th style="width: 10%">ประเภทงบ</th>
-                    <th style="width: 10%">แหล่งงบประมาณ</th>
-                    <th class="text-center" style="width: 15%">ระยะเวลาดำเนินการ</th>
-                    <th class="text-end" style="width: 10%">อนุมัติ</th>
-                    <th class="text-end" style="width: 10%">จัดสรร</th>
-                </tr>
-              </thead>
-              <tbody id="searchTableBody">
-                 <tr><td colspan="8" class="text-center py-5 text-muted"><i class="fas fa-search fa-2x mb-2 opacity-50"></i><br>กรุณาเลือกกลุ่มงานและกดค้นหา</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+        <div class="card border-0 shadow-sm"><div class="card-body"><div class="table-responsive"><table id="searchTable" class="table table-hover w-100"><thead class="table-light"><tr><th class="ps-3">ลำดับ</th><th>กลุ่มงาน</th><th>รายการ/กิจกรรม</th><th>ประเภทงบ</th><th>แหล่งงบ</th><th class="text-center">ระยะเวลา</th><th class="text-end">อนุมัติ</th><th class="text-end">จัดสรร</th></tr></thead><tbody id="searchTableBody"></tbody></table></div></div></div>
     </div>
 
     <div id="yearly-page" class="page-section d-none fade-in">
-      <div class="mb-4">
-        <h3 class="fw-bold text-dark"><i class="fas fa-calendar-alt me-2 text-secondary"></i>แผนงานประจำปี</h3>
-        <p class="text-muted small">ติดตามสถานะโครงการและกรอบเวลาดำเนินงาน (ต.ค.-ก.ย.)</p>
-      </div>
-      <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body bg-light rounded-3 py-3">
-          <div class="row align-items-end">
-            <div class="col-md-6 mb-3 mb-md-0">
-              <label class="form-label fw-bold mb-1 small">กรองตามกลุ่มงาน</label>
-              <select class="form-select" id="yearlyDeptSelect"><option value="">-- แสดงทั้งหมด --</option></select>
+       <div class="mb-4"><h3 class="fw-bold text-dark"><i class="fas fa-calendar-alt me-2 text-secondary"></i>แผนงานประจำปี</h3></div>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body bg-light rounded-3 py-3">
+              <div class="row align-items-end">
+                <div class="col-md-6 mb-3 mb-md-0"><label class="form-label fw-bold small">กรองตามกลุ่มงาน</label><select class="form-select" id="yearlyDeptSelect"></select></div>
+                <div class="col-md-3 mb-2 mb-md-0"><button class="btn btn-success w-100" onclick="loadYearlyData()">ค้นหา</button></div>
+                <div class="col-md-3"><button class="btn btn-secondary w-100" onclick="resetYearly()">ล้างค่า</button></div>
+              </div>
             </div>
-            <div class="col-md-3 mb-2 mb-md-0">
-               <button class="btn btn-success w-100" type="button" onclick="loadYearlyData()"><i class="fas fa-search"></i> ค้นหา</button>
-            </div>
-            <div class="col-md-3">
-               <button class="btn btn-secondary w-100" type="button" onclick="resetYearly()"><i class="fas fa-undo"></i> ล้างค่า</button>
-            </div>
-          </div>
         </div>
-      </div>
-      <div class="row g-3 mb-4">
-        <div class="col-md-4"><div class="card shadow-sm border-start border-4 border-primary h-100"><div class="card-body py-2"><div class="small text-muted">จำนวนโครงการ</div><div class="fs-4 fw-bold text-primary" id="yp-count">0</div></div></div></div>
-        <div class="col-md-4"><div class="card shadow-sm border-start border-4 border-success h-100"><div class="card-body py-2"><div class="small text-muted">งบจัดสรรรวม</div><div class="fs-4 fw-bold text-success" id="yp-alloc">0.00</div></div></div></div>
-        <div class="col-md-4"><div class="card shadow-sm border-start border-4 border-danger h-100"><div class="card-body py-2"><div class="small text-muted">เบิกจ่ายสะสม</div><div class="fs-4 fw-bold text-danger" id="yp-spent">0.00</div></div></div></div>
-      </div>
-      <div class="card border-0 shadow-sm">
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table id="yearlyTable" class="table table-hover align-middle mb-0 w-100" style="font-size: 0.9rem;">
-              <thead class="bg-light">
-                <tr>
-                    <th class="ps-3 py-3" style="width: 5%">ลำดับโครงการ</th>
-                    <th style="width: 15%">กลุ่มงาน</th>
-                    <th style="width: 25%">โครงการ/กิจกรรม</th>
-                    <th style="width: 10%">ประเภทงบ</th>
-                    <th style="width: 10%">แหล่งงบประมาณ</th>
-                    <th class="text-center" style="width: 15%">ระยะเวลาดำเนินการ</th>
-                    <th class="text-end" style="width: 10%">งบจัดสรร</th>
-                    <th class="text-end" style="width: 10%">เบิกจ่าย</th>
-                    <th class="text-end pe-3" style="width: 10%">คงเหลือ</th>
-                </tr>
-              </thead>
-              <tbody id="yearlyTableBody">
-                 <tr><td colspan="9" class="text-center py-5 text-muted"><i class="fas fa-filter fa-2x mb-2 opacity-50"></i><br>กรุณาเลือกกลุ่มงานเพื่อดูข้อมูล</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+        <div class="card border-0 shadow-sm"><div class="card-body p-0"><div class="table-responsive"><table id="yearlyTable" class="table table-hover align-middle mb-0 w-100"><thead class="bg-light"><tr><th class="ps-3">ลำดับ</th><th>กลุ่มงาน</th><th>โครงการ/กิจกรรม</th><th>ประเภทงบ</th><th>แหล่งงบ</th><th class="text-center">ระยะเวลา</th><th class="text-end">จัดสรร</th><th class="text-end">เบิกจ่าย</th><th class="text-end pe-3">คงเหลือ</th></tr></thead><tbody id="yearlyTableBody"></tbody></table></div></div></div>
     </div>
 
     <div id="transaction-page" class="page-section d-none fade-in">
-      <div class="mb-4">
-        <h3 class="fw-bold text-dark"><i class="fas fa-file-invoice-dollar me-2 text-secondary"></i>บันทึกรายการเบิกจ่าย</h3>
-        <p class="text-muted small">ระบบบันทึกและตัดยอดงบประมาณโครงการ</p>
-      </div>
+      <div class="mb-4"><h3 class="fw-bold text-dark"><i class="fas fa-file-invoice-dollar me-2 text-secondary"></i>บันทึกรายการเบิกจ่าย</h3></div>
       <div class="row">
         <div class="col-lg-5 mb-4">
           <div class="card border-0 shadow-sm">
             <div class="card-header bg-success text-white"><i class="fas fa-edit me-2"></i>ฟอร์มบันทึกข้อมูล</div>
             <div class="card-body bg-light">
               <form id="txForm" onsubmit="event.preventDefault(); submitTransaction();">
-                <div class="mb-3"><label class="form-label fw-bold small">1. กลุ่มงาน/งาน</label><select class="form-select" id="txDept" required onchange="loadTxProjects()"><option value="">-- เลือกกลุ่มงาน --</option></select></div>
-                <div class="mb-3"><label class="form-label fw-bold small">2. โครงการ</label><select class="form-select" id="txProject" required disabled onchange="loadTxActivities()"><option value="">-- เลือกโครงการ --</option></select></div>
-                <div class="mb-3"><label class="form-label fw-bold small">3. กิจกรรมหลัก</label><select class="form-select" id="txActivity" required disabled onchange="showBudgetInfo()"><option value="">-- เลือกกิจกรรม --</option></select></div>
-                <div class="alert alert-info py-2 d-none" id="budgetInfoBox"><div class="d-flex justify-content-between"><small>จัดสรร: <span id="infoAlloc" class="fw-bold">0</span></small><small>คงเหลือ: <span id="infoBal" class="fw-bold text-danger">0</span></small></div></div>
+                <div class="mb-3">
+                  <label class="form-label fw-bold small">1. ลำดับโครงการ</label>
+                  <select class="form-select select2" id="txOrder" required style="width: 100%;"><option value="">-- เลือกลำดับ --</option></select>
+                </div>
+                <div class="alert alert-secondary d-none" id="txProjectInfo">
+                   <div class="small"><strong>ชื่อโครงการ:</strong> <span id="tx_disp_proj" class="text-dark"></span></div>
+                   <div class="small"><strong>กลุ่มงาน:</strong> <span id="tx_disp_dept" class="text-dark"></span></div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label fw-bold small">2. กิจกรรมหลัก</label>
+                  <select class="form-select" id="txActivity" required disabled onchange="onTxActivityChange()"><option value="">-- เลือกกิจกรรม --</option></select>
+                </div>
+                <div class="mb-3 d-none" id="divTxSubActivity">
+                  <label class="form-label fw-bold small">3. กิจกรรมย่อย</label>
+                  <select class="form-select" id="txSubActivity" onchange="showTxBudgetInfo()"><option value="">-- เลือกกิจกรรมย่อย --</option></select>
+                </div>
+                <div class="alert alert-info border small text-dark d-none" id="txInfoBox">
+                   <div class="d-flex justify-content-between border-top pt-2 mt-2">
+                      <span>จัดสรร: <strong id="tx_alloc" class="text-success"></strong></span>
+                      <span>คงเหลือ: <strong id="tx_bal" class="text-danger"></strong></span>
+                   </div>
+                </div>
                 <hr class="opacity-25">
                 <div class="row g-2 mb-3">
                   <div class="col-6"><label class="form-label fw-bold small">วันที่เบิก</label><input type="date" class="form-control" id="txDate" required></div>
                   <div class="col-6"><label class="form-label fw-bold small">ยอดเงิน (บาท)</label><input type="number" step="0.01" class="form-control text-end fw-bold text-success" id="txAmount" placeholder="0.00" required></div>
                 </div>
-                <div class="mb-3"><label class="form-label fw-bold small">ประเภทค่าใช้จ่าย</label><select class="form-select" id="txExpenseType"><option>ค่าตอบแทน</option><option>ค่าใช้สอย</option><option>ค่าวัสดุ</option><option>ค่าครุภัณฑ์</option><option>ค่าสาธารณูปโภค</option><option>อื่นๆ</option></select></div>
+                <div class="mb-3">
+                  <label class="form-label fw-bold small">ประเภทค่าใช้จ่าย</label>
+                  <select class="form-select" id="txExpenseType" required>
+                    <option value="" selected disabled>-- กรุณาเลือก --</option>
+                    <option>ค่าตอบแทน</option><option>ค่าใช้สอย</option><option>ค่าวัสดุ</option><option>ค่าครุภัณฑ์</option><option>ค่าสาธารณูปโภค</option><option>อื่นๆ</option>
+                  </select>
+                </div>
                 <div class="mb-3"><label class="form-label fw-bold small">รายละเอียด</label><textarea class="form-control" id="txDesc" rows="2"></textarea></div>
                 <button type="submit" class="btn btn-success w-100 shadow-sm" id="btnSaveTx"><i class="fas fa-save me-2"></i>บันทึกและตัดยอด</button>
               </form>
             </div>
           </div>
         </div>
+        <div class="col-lg-7"><div class="card border-0 shadow-sm h-100"><div class="card-header bg-white fw-bold border-bottom-0 pt-3"><i class="fas fa-history me-2 text-muted"></i>รายการเบิกจ่ายล่าสุด</div><div class="card-body p-0"><div class="table-responsive" style="max-height: 500px; overflow-y: auto;"><table class="table table-striped table-hover mb-0 align-middle small"><thead class="table-light sticky-top"><tr><th class="ps-3">โครงการ</th><th>กิจกรรม</th><th>วันที่</th><th>ประเภท</th><th>รายละเอียด</th><th class="text-end pe-3">ยอดเงิน</th></tr></thead><tbody id="txHistoryTable"></tbody></table></div></div></div></div>
+      </div>
+    </div>
+
+    <div id="loan-page" class="page-section d-none fade-in">
+      <div class="mb-4"><h3 class="fw-bold text-dark"><i class="fas fa-hand-holding-usd me-2 text-primary"></i>บันทึกรายการเงินยืม</h3></div>
+      <div class="row">
+        <div class="col-lg-5 mb-4">
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-primary text-white fw-bold"><i class="fas fa-edit me-2"></i>ฟอร์มบันทึกเงินยืม</div>
+            <div class="card-body bg-light">
+              <form id="loanForm" onsubmit="event.preventDefault(); submitLoan();">
+                <div class="mb-3"><label class="form-label fw-bold small">1. กลุ่มงาน/งาน</label><select class="form-select" id="loanDept" required onchange="onLoanDeptChange()"></select></div>
+                <div class="mb-3"><label class="form-label fw-bold small">2. โครงการ</label><select class="form-select" id="loanProject" required disabled onchange="onLoanProjectChange()"></select></div>
+                <div class="mb-3"><label class="form-label fw-bold small">3. กิจกรรมหลัก</label><select class="form-select" id="loanActivity" required disabled onchange="showLoanBudgetInfo()"></select></div>
+                <div class="alert alert-light border small text-muted d-none" id="loanInfoBox">
+                   <div class="d-flex justify-content-between"><span>ประเภทงบ:</span><span id="l_type" class="fw-bold text-dark"></span></div>
+                   <div class="d-flex justify-content-between"><span>แหล่งงบ:</span><span id="l_source" class="fw-bold text-dark"></span></div>
+                   <div class="d-flex justify-content-between"><span>จัดสรร:</span><span id="l_alloc" class="fw-bold text-success"></span></div>
+                   <div class="d-flex justify-content-between"><span>เงินยืมสะสม:</span><span id="l_loaned" class="fw-bold text-primary"></span></div>
+                </div>
+                <hr class="opacity-25">
+                <div class="row g-2 mb-3">
+                  <div class="col-6"><label class="form-label fw-bold small">วันที่ยืม</label><input type="date" class="form-control" id="loanDate" required></div>
+                  <div class="col-6"><label class="form-label fw-bold small">จำนวนเงิน</label><input type="number" step="0.01" class="form-control text-end fw-bold text-primary" id="loanAmount" placeholder="0.00" required></div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label fw-bold small">ประเภทเงินยืม</label>
+                  <select class="form-select" id="loanType" required><option value="" selected disabled>-- กรุณาเลือก --</option><option>ประชุม/อบรม</option><option>เดินทางไปราชการ</option><option>ค่าจ้างเหมา</option><option>ค่าเช่าบริการ</option><option>อื่นๆ</option></select>
+                </div>
+                <div class="mb-3"><label class="form-label fw-bold small">รายละเอียดการยืม</label><textarea class="form-control" id="loanDesc" rows="2"></textarea></div>
+                <button type="submit" class="btn btn-primary w-100 shadow-sm" id="btnSaveLoan"><i class="fas fa-save me-2"></i>บันทึกรายการ</button>
+              </form>
+            </div>
+          </div>
+        </div>
         <div class="col-lg-7">
+          <div class="card border-0 shadow-sm mb-3">
+             <div class="card-header bg-white fw-bold border-bottom-0 pt-3"><i class="fas fa-chart-pie me-2 text-muted"></i>สรุปยอดเงินยืมรายโครงการ</div>
+             <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0 small"><thead class="table-light"><tr><th class="ps-3">โครงการ</th><th class="text-end pe-3">รวมเงินยืม</th></tr></thead><tbody id="loanSummaryTable"></tbody></table></div></div>
+          </div>
           <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white fw-bold border-bottom-0 pt-3"><i class="fas fa-history me-2 text-muted"></i>รายการเบิกจ่ายล่าสุด</div>
+            <div class="card-header bg-white fw-bold border-bottom-0 pt-3"><i class="fas fa-history me-2 text-muted"></i>ประวัติการยืมเงินล่าสุด</div>
             <div class="card-body p-0">
-              <div class="table-responsive">
-                <table class="table table-striped table-hover mb-0 align-middle" style="font-size: 0.85rem;">
-                  <thead class="table-light"><tr><th class="ps-3">วันที่</th><th>กิจกรรม</th><th>รายละเอียด</th><th class="text-end pe-3">ยอดเงิน</th></tr></thead>
-                  <tbody id="txHistoryTable"></tbody>
+              <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                <table class="table table-striped table-hover mb-0 align-middle small">
+                  <thead class="table-light sticky-top">
+                    <tr><th class="ps-3">โครงการ</th><th>กิจกรรม</th><th>วันที่</th><th>ประเภท</th><th>รายละเอียด</th><th class="text-end pe-3">ยอดเงิน</th></tr>
+                  </thead>
+                  <tbody id="loanHistoryTable"></tbody>
                 </table>
               </div>
             </div>
@@ -263,6 +219,7 @@
   <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <?!= include('js'); ?>
 </body>
 </html>
