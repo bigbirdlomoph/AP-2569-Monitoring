@@ -1,6 +1,6 @@
 var SPREADSHEET_ID = '1BhZDqEU7XKhgYgYnBrbFI7IMbr_SLdhU8rvhAMddodQ'; 
 var SHEET_NAME = 'm_actionplan';
-var APP_VERSION = '690127-1130'; 
+var APP_VERSION = '690127-1400'; 
 
 function doGet() {
   var template = HtmlService.createTemplateFromFile('index');
