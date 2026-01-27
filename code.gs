@@ -1,6 +1,6 @@
 var SPREADSHEET_ID = '1BhZDqEU7XKhgYgYnBrbFI7IMbr_SLdhU8rvhAMddodQ'; 
 var SHEET_NAME = 'm_actionplan';
-var APP_VERSION = '690126-1715'; 
+var APP_VERSION = '690127-1130'; 
 
 function doGet() {
   var template = HtmlService.createTemplateFromFile('index');
@@ -97,9 +97,15 @@ function searchActionPlan(deptName) {
     var headers = data.shift();
     var getIdx = function(name) { return headers.findIndex(h => String(h).trim() === name); };
 
-    var idxOrder = getIdx('ลำดับโครงการ'); var idxDept = getIdx('กลุ่มงาน/งาน'); var idxProject = getIdx('โครงการ');
-    var idxActivity = getIdx('กิจกรรมหลัก'); var idxSub = getIdx('กิจกรรมย่อย'); var idxType = getIdx('ประเภทงบ');
-    var idxSource = getIdx('แหล่งงบประมาณ'); var idxApproved = getIdx('อนุมัติตามแผน'); var idxAllocated = getIdx('จัดสรร');
+    var idxOrder = getIdx('ลำดับโครงการ'); 
+    var idxDept = getIdx('กลุ่มงาน/งาน'); 
+    var idxProject = getIdx('โครงการ');
+    var idxActivity = getIdx('กิจกรรมหลัก'); 
+    var idxSub = getIdx('กิจกรรมย่อย'); 
+    var idxType = getIdx('ประเภทงบ');
+    var idxSource = getIdx('แหล่งงบประมาณ'); 
+    var idxApproved = getIdx('อนุมัติตามแผน'); 
+    var idxAllocated = getIdx('จัดสรร');
     
     var monthIndices = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'].map(m => getIdx(m));
     var parseNum = (val) => { var v = parseFloat(String(val).replace(/,/g, '')); return isNaN(v) ? 0 : v; };
@@ -113,6 +119,7 @@ function searchActionPlan(deptName) {
         
         var approved = (idxApproved > -1) ? parseNum(row[idxApproved]) : 0;
         var allocated = (idxAllocated > -1) ? parseNum(row[idxAllocated]) : 0;
+        
         summary.count++; summary.approved += approved; summary.allocated += allocated;
         var timeline = monthIndices.map(idx => (idx > -1 && String(row[idx]).trim() !== '') ? 1 : 0);
         results.push({ 
@@ -138,6 +145,7 @@ function getYearlyPlanData(deptFilter) {
     var idxActivity = getIdx('กิจกรรมหลัก'); var idxSub = getIdx('กิจกรรมย่อย'); var idxType = getIdx('ประเภทงบ');
     var idxSource = getIdx('แหล่งงบประมาณ'); var idxApproved = getIdx('อนุมัติตามแผน'); var idxAllocated = getIdx('จัดสรร');
     var idxSpent = getIdx('เบิกจ่าย');
+    
     var monthIndices = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'].map(m => getIdx(m));
     var summary = { projects: 0, approved: 0, allocated: 0, spent: 0 };
     var list = [];
@@ -155,6 +163,7 @@ function getYearlyPlanData(deptFilter) {
         
         summary.projects++; summary.approved += approved; summary.allocated += alloc; summary.spent += spent;
         var timeline = monthIndices.map(idx => (idx > -1 && String(row[idx]).trim() !== '') ? 1 : 0);
+        
         list.push({ 
             order: (idxOrder > -1) ? row[idxOrder] : "-", dept: rowDept, project: (idxProject > -1) ? row[idxProject] : "-", 
             activity: actName, type: (idxType > -1) ? row[idxType] : "-", budgetSource: (idxSource > -1) ? row[idxSource] : "-", 
@@ -174,17 +183,13 @@ function saveTransaction(form) {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     var mSheet = ss.getSheetByName('m_actionplan');
     var tSheet = ss.getSheetByName('t_actionplan'); 
-    
-    if (!tSheet) {
-      tSheet = ss.insertSheet('t_actionplan');
-      tSheet.appendRow(['ประทับเวลา', 'รหัสโครงการ', 'ปีงบประมาณ', 'หมวด', 'ลำดับโครงการ', 'กลุ่มงาน/งาน', 'แผนงาน', 'โครงการ', 'กิจกรรมหลัก', 'กิจกรรมย่อย', 'ประเภทงบ', 'แหล่งงบประมาณ', 'รหัสงบประมาณ', 'รหัสกิจกรรม', 'จัดสรร', 'เบิกจ่ายครั้งนี้', 'เงินยืม', 'วันที่เบิกจ่าย', 'ประเภทค่าใช้จ่าย', 'รายละเอียดการเบิกจ่าย', 'หมายเหตุ']);
-    }
+    if (!tSheet) { tSheet = ss.insertSheet('t_actionplan'); }
 
     var mData = mSheet.getDataRange().getValues();
     var mHeaders = mData.shift();
     var getIdx = (name) => mHeaders.findIndex(h => String(h).trim() === name);
-    
     var idxID = getIdx('รหัสโครงการ'); var idxSpent = getIdx('เบิกจ่าย'); 
+    
     var rowIndex = -1;
     for (var i = 0; i < mData.length; i++) {
       if (String(mData[i][idxID]) === String(form.projectId)) { rowIndex = i; break; }
@@ -221,7 +226,7 @@ function getTransactionHistory() {
   } catch(e) { return []; }
 }
 
-// 5. LOAN & SEARCH (UPDATED STATUS DEFAULT)
+// 5. LOAN & SEARCH
 function saveLoan(form) {
   var lock = LockService.getScriptLock();
   try {
@@ -229,17 +234,13 @@ function saveLoan(form) {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     var mSheet = ss.getSheetByName('m_actionplan');
     var tSheet = ss.getSheetByName('t_loan'); 
-    
-    if (!tSheet) {
-      tSheet = ss.insertSheet('t_loan');
-      tSheet.appendRow(['ประทับเวลา', 'รหัสโครงการ', 'ปีงบประมาณ', 'หมวด', 'ลำดับโครงการ', 'กลุ่มงาน/งาน', 'แผนงาน', 'โครงการ', 'กิจกรรมหลัก', 'กิจกรรมย่อย', 'ประเภทงบ', 'แหล่งงบประมาณ', 'รหัสงบประมาณ', 'รหัสกิจกรรม', 'จัดสรร', 'เงินยืม', 'วันที่ยืมเงิน', 'รายละเอียดการยืมเงิน', 'หมายเหตุ', 'ประเภทเงินยืม', 'สถานะการเบิกจ่าย', 'จำนวนเบิกจ่าย', 'คงเหลือ', 'วันที่เบิกจ่าย', 'ระยะเวลาที่ยืม']);
-    }
+    if (!tSheet) { tSheet = ss.insertSheet('t_loan'); }
 
     var mData = mSheet.getDataRange().getValues();
     var mHeaders = mData.shift();
     var getIdx = (name) => mHeaders.findIndex(h => String(h).trim() === name);
-    
     var idxID = getIdx('รหัสโครงการ'); var idxLoan = getIdx('เงินยืม'); 
+    
     var rowIndex = -1;
     for (var i = 0; i < mData.length; i++) {
       if (String(mData[i][idxID]) === String(form.projectId)) { rowIndex = i; break; }
@@ -257,7 +258,7 @@ function saveLoan(form) {
     tSheet.appendRow([ 
       new Date(), rowData[idxID], rowData[getIdx('ปีงบประมาณ')], rowData[getIdx('หมวด')], rowData[getIdx('ลำดับโครงการ')], rowData[getIdx('กลุ่มงาน/งาน')], rowData[getIdx('แผนงาน')], rowData[getIdx('โครงการ')], rowData[getIdx('กิจกรรมหลัก')], rowData[getIdx('กิจกรรมย่อย')], rowData[getIdx('ประเภทงบ')], rowData[getIdx('แหล่งงบประมาณ')], rowData[getIdx('รหัสงบประมาณ')], rowData[getIdx('รหัสกิจกรรม')], rowData[getIdx('จัดสรร')], 
       amount, form.loanDate, form.desc, "", form.loanType,
-      "ยังไม่ดำเนินการ", 0, amount, "", "" // ** UPDATED HERE **
+      "ยังไม่ดำเนินการ", 0, amount, "", "" 
     ]);
     return { status: 'success', message: 'บันทึกการยืมเงินเรียบร้อยแล้ว' };
   } catch (e) { return { status: 'error', message: e.message }; } finally { lock.releaseLock(); }
@@ -328,6 +329,7 @@ function getLoanHistory() {
     var idxDate = getIdx('วันที่ยืมเงิน'); var idxType = getIdx('ประเภทเงินยืม'); var idxDetail = getIdx('รายละเอียดการยืมเงิน'); 
     var idxAmt = getIdx('เงินยืม'); var idxTime = getIdx('ประทับเวลา');
     var idxStatus = getIdx('สถานะการเบิกจ่าย'); var idxBal = getIdx('คงเหลือ');
+    var idxPaid = getIdx('จำนวนเบิกจ่าย'); var idxPayDate = getIdx('วันที่เบิกจ่าย');
 
     if (idxAmt === -1) return [];
 
@@ -337,6 +339,8 @@ function getLoanHistory() {
       if (row[idxAmt]) {
          var d = row[idxDate]; var dateStr = (d instanceof Date) ? Utilities.formatDate(d, "Asia/Bangkok", "dd/MM/yyyy") : String(d);
          var isoTime = (row[idxTime] instanceof Date) ? row[idxTime].toISOString() : "";
+         var payDateStr = (idxPayDate > -1 && row[idxPayDate]) ? Utilities.formatDate(new Date(row[idxPayDate]), "Asia/Bangkok", "dd/MM/yyyy") : '';
+
          result.push({
            timestamp: isoTime,
            order: (idxOrder > -1) ? row[idxOrder] : '-', 
@@ -348,7 +352,9 @@ function getLoanHistory() {
            details: (idxDetail > -1) ? row[idxDetail] : '-',
            amount: row[idxAmt],
            status: (idxStatus > -1) ? row[idxStatus] : 'ยังไม่ดำเนินการ',
-           balance: (idxBal > -1 && row[idxBal] !== "") ? row[idxBal] : row[idxAmt]
+           balance: (idxBal > -1 && row[idxBal] !== "") ? row[idxBal] : row[idxAmt],
+           paid: (idxPaid > -1) ? (parseFloat(String(row[idxPaid]).replace(/,/g,'')) || 0) : 0, 
+           payDate: payDateStr 
          });
       }
       if (result.length >= 10) break;
@@ -371,6 +377,7 @@ function searchLoanHistory(criteria) {
     var idxProj = getIdx('โครงการ'); var idxAct = getIdx('กิจกรรมหลัก'); var idxSub = getIdx('กิจกรรมย่อย');
     var idxDate = getIdx('วันที่ยืมเงิน'); var idxType = getIdx('ประเภทเงินยืม'); var idxDetail = getIdx('รายละเอียดการยืมเงิน'); 
     var idxAmt = getIdx('เงินยืม'); var idxTime = getIdx('ประทับเวลา'); var idxStatus = getIdx('สถานะการเบิกจ่าย'); var idxBal = getIdx('คงเหลือ');
+    var idxPaid = getIdx('จำนวนเบิกจ่าย'); var idxPayDate = getIdx('วันที่เบิกจ่าย');
 
     var result = [];
     data.forEach(function(row) {
@@ -381,6 +388,8 @@ function searchLoanHistory(criteria) {
         if (matchOrder && matchAct && matchSub && row[idxAmt]) {
              var d = row[idxDate]; var dateStr = (d instanceof Date) ? Utilities.formatDate(d, "Asia/Bangkok", "dd/MM/yyyy") : String(d);
              var isoTime = (row[idxTime] instanceof Date) ? row[idxTime].toISOString() : "";
+             var payDateStr = (idxPayDate > -1 && row[idxPayDate]) ? Utilities.formatDate(new Date(row[idxPayDate]), "Asia/Bangkok", "dd/MM/yyyy") : '';
+
              result.push({
                timestamp: isoTime,
                order: (idxOrder > -1) ? row[idxOrder] : '-',
@@ -388,7 +397,10 @@ function searchLoanHistory(criteria) {
                activity: (idxAct > -1) ? row[idxAct] : '-',
                subActivity: (idxSub > -1) ? row[idxSub] : '',
                date: dateStr, type: (idxType > -1) ? row[idxType] : '-', details: (idxDetail > -1) ? row[idxDetail] : '-', amount: row[idxAmt],
-               status: (idxStatus > -1) ? row[idxStatus] : 'ยังไม่ดำเนินการ', balance: (idxBal > -1 && row[idxBal] !== "") ? row[idxBal] : row[idxAmt]
+               status: (idxStatus > -1) ? row[idxStatus] : 'ยังไม่ดำเนินการ', 
+               balance: (idxBal > -1 && row[idxBal] !== "") ? row[idxBal] : row[idxAmt],
+               paid: (idxPaid > -1) ? (parseFloat(String(row[idxPaid]).replace(/,/g,'')) || 0) : 0,
+               payDate: payDateStr
              });
         }
     });
