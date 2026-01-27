@@ -8,18 +8,13 @@
     --bg-body: #f4f6f9;
   }
   body { font-family: 'Prompt', sans-serif; background-color: var(--bg-body); color: #333; }
-  
-  /* FIX 2: Sticky Header Overlap - Set Navbar Z-Index higher than tables */
   .navbar-custom { background-color: var(--header-green); padding: 0.8rem 0; z-index: 1050; position: sticky; top: 0; }
   .navbar-brand { color: white !important; font-weight: 700; font-size: 1.25rem; letter-spacing: 0.5px; }
   .nav-pill-btn { color: white; background: transparent; border: 1px solid transparent; border-radius: 50px; padding: 6px 20px; margin-left: 10px; text-decoration: none; font-size: 0.9rem; transition: all 0.2s; cursor: pointer; }
   .nav-pill-btn:hover { background: rgba(255,255,255,0.1); }
   .nav-pill-btn.active, .dropdown-item:active { background: white; color: var(--header-green); font-weight: 600; }
-  .dropdown-menu { border-radius: 10px; z-index: 1060; } /* Dropdown higher than navbar */
-  
-  /* Lower Table Header Z-Index */
+  .dropdown-menu { border-radius: 10px; z-index: 1060; }
   thead.sticky-top { z-index: 900; }
-
   .section-title { font-weight: 700; font-size: 1.2rem; margin-bottom: 1rem; border-bottom: 3px solid #a3cfbb; display: inline-block; padding-bottom: 5px; padding-right: 15px; }
   
   .card-metric { 
@@ -53,7 +48,6 @@
   .dot-active { background-color: var(--card-green); box-shadow: 0 0 2px var(--card-green); }
   .dot-inactive { background-color: #e9ecef; }
 
-  /* FIX 1: SELECT2 DROPDOWN WRAP & WIDTH */
   .select2-container .select2-selection--single { height: auto !important; min-height: 38px; }
   .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered { 
       white-space: normal !important; 
@@ -70,8 +64,21 @@
       font-size: 0.9rem;
   }
   .select2-dropdown {
-      min-width: 300px !important; /* Min width for readability */
-      max-width: 400px !important; /* Max width to prevent overflow */
-      z-index: 1070; /* Ensure dropdowns are above everything */
+      min-width: 300px !important; 
+      max-width: 400px !important; 
+      z-index: 1070; 
+  }
+
+  /* Back to Top */
+  #btn-back-to-top {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: none;
+    z-index: 1080;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
   }
 </style>
