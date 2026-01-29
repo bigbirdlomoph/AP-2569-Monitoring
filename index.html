@@ -134,7 +134,7 @@
                      <div class="col-md-3"><label class="small fw-bold text-muted">ลำดับ</label><select id="searchTxOrder" class="form-select form-select-sm select2" style="width: 100%;"><option value="">-- เลือกลำดับ --</option></select></div>
                      <div class="col-md-3"><label class="small fw-bold text-muted">โครงการ</label><select id="searchTxProj" class="form-select form-select-sm select2" style="width: 100%;" disabled><option value="">-- ทั้งหมด --</option></select></div>
                      <div class="col-md-3"><label class="small fw-bold text-muted">กิจกรรมหลัก</label><select id="searchTxAct" class="form-select form-select-sm select2" style="width: 100%;" disabled><option value="">-- ทั้งหมด --</option></select></div>
-                     <div class="col-md-3 d-none" id="divsearchTxSub"><label class="small fw-bold text-muted">กิจกรรมย่อย</label><select id="searchTxSub" class="form-select form-select-sm select2" style="width: 100%;" disabled><option value="">-- เลือกกิจกรรมย่อย --</option></select></div>
+                     <div class="col-md-3 d-none" id="wrapper_searchTx_sub"><label class="small fw-bold text-muted">กิจกรรมย่อย</label><select id="searchTxSub" class="form-select form-select-sm select2" style="width: 100%;" disabled><option value="">-- เลือกกิจกรรมย่อย --</option></select></div>
                      <div class="col-12 text-end mt-2"><button class="btn btn-sm btn-secondary me-1" onclick="resetTxSearch()">ล้างค่า</button><button class="btn btn-sm btn-success" onclick="runTxSearch()">ค้นหา</button></div>
                  </div>
              </div>
@@ -167,8 +167,23 @@
                 <div class="mb-3"><label class="form-label fw-bold small">1. ลำดับโครงการ</label><select class="form-select select2" id="loanOrder" required style="width: 100%;"><option value="">-- เลือกลำดับ --</option></select></div>
                 <div class="alert alert-secondary d-none" id="loanProjectInfo"><div class="small"><strong>ชื่อโครงการ:</strong> <span id="loan_disp_proj" class="text-dark"></span></div><div class="small"><strong>กลุ่มงาน:</strong> <span id="loan_disp_dept" class="text-dark"></span></div></div>
                 <div class="mb-3"><label class="form-label fw-bold small">2. กิจกรรมหลัก</label><select class="form-select select2" id="loanActivity" required disabled style="width: 100%;"><option value="">-- เลือกกิจกรรม --</option></select></div>
-                <div class="alert alert-light border small text-muted d-none" id="loanInfoBox"><div class="d-flex justify-content-between"><span>ประเภทงบ:</span><span id="l_type" class="fw-bold text-dark"></span></div><div class="d-flex justify-content-between"><span>แหล่งงบ:</span><span id="l_source" class="fw-bold text-dark"></span></div><div class="d-flex justify-content-between"><span>จัดสรร:</span><span id="l_alloc" class="fw-bold text-success"></span></div><div class="d-flex justify-content-between"><span>เงินยืมสะสม:</span><span id="l_loaned" class="fw-bold text-primary"></span></div></div>
+                
+                <div class="mb-3 d-none" id="divLoanSubActivity">
+                    <label class="form-label fw-bold small">3. กิจกรรมย่อย</label>
+                    <select class="form-select" id="loanSubActivity" onchange="showLoanBudgetInfoFromSub()">
+                        <option value="">-- เลือกกิจกรรมย่อย --</option>
+                    </select>
+                </div>
+
+                <div class="alert alert-light border small text-muted d-none" id="loanInfoBox">
+                    <div class="d-flex justify-content-between"><span>ประเภทงบ:</span><span id="l_type" class="fw-bold text-dark"></span></div>
+                    <div class="d-flex justify-content-between"><span>แหล่งงบ:</span><span id="l_source" class="fw-bold text-dark"></span></div>
+                    <div class="d-flex justify-content-between"><span>จัดสรร:</span><span id="l_alloc" class="fw-bold text-success"></span></div>
+                    <div class="d-flex justify-content-between"><span>เบิกจ่าย:</span><span id="l_spent" class="fw-bold text-danger"></span></div>
+                    <div class="d-flex justify-content-between border-top pt-1 mt-1"><span>เงินยืมสะสม:</span><span id="l_loaned" class="fw-bold text-primary"></span></div>
+                </div>
                 <hr class="opacity-25">
+                
                 <div class="row g-2 mb-3"><div class="col-6"><label class="form-label fw-bold small">วันที่ยืม</label><input type="date" class="form-control" id="loanDate" required></div><div class="col-6"><label class="form-label fw-bold small">จำนวนเงิน</label><input type="number" step="0.01" class="form-control text-end fw-bold text-primary" id="loanAmount" placeholder="0.00" required></div></div>
                 <div class="mb-3"><label class="form-label fw-bold small">ประเภทเงินยืม</label><select class="form-select" id="loanType" required><option value="" selected disabled>-- กรุณาเลือก --</option><option>ประชุม/อบรม</option><option>เดินทางไปราชการ</option><option>ค่าจ้างเหมา</option><option>ค่าเช่าบริการ</option><option>อื่นๆ</option></select></div>
                 <div class="mb-3"><label class="form-label fw-bold small">รายละเอียดการยืม</label><textarea class="form-control" id="loanDesc" rows="2"></textarea></div>
@@ -186,7 +201,7 @@
                      <div class="col-md-3"><label class="small fw-bold text-muted">ลำดับ</label><select id="searchLoanOrder" class="form-select form-select-sm select2" style="width: 100%;"><option value="">-- เลือกลำดับ --</option></select></div>
                      <div class="col-md-3"><label class="small fw-bold text-muted">โครงการ</label><select id="searchLoanProj" class="form-select form-select-sm select2" style="width: 100%;" disabled><option value="">-- ทั้งหมด --</option></select></div>
                      <div class="col-md-3"><label class="small fw-bold text-muted">กิจกรรมหลัก</label><select id="searchLoanAct" class="form-select form-select-sm select2" style="width: 100%;" disabled><option value="">-- ทั้งหมด --</option></select></div>
-                     <div class="col-md-3 d-none" id="divsearchLoanSub"><label class="small fw-bold text-muted">กิจกรรมย่อย</label><select id="searchLoanSub" class="form-select form-select-sm select2" style="width: 100%;" disabled><option value="">-- เลือกกิจกรรมย่อย --</option></select></div>
+                     <div class="col-md-3 d-none" id="wrapper_searchLoan_sub"><label class="small fw-bold text-muted">กิจกรรมย่อย</label><select id="searchLoanSub" class="form-select form-select-sm select2" style="width: 100%;" disabled><option value="">-- เลือกกิจกรรมย่อย --</option></select></div>
                      <div class="col-12 text-end mt-2"><button class="btn btn-sm btn-secondary me-1" onclick="resetLoanSearch()">ล้างค่า</button><button class="btn btn-sm btn-primary" onclick="runLoanSearch()">ค้นหา</button></div>
                  </div>
              </div>
@@ -197,7 +212,13 @@
               <div class="table-responsive p-3">
                 <table id="tableLoanHistory" class="table table-striped table-hover mb-0 align-middle small w-100">
                   <thead class="table-light sticky-top">
-                    <tr><th class="ps-3" style="width: 8%">ลำดับ</th><th style="width: 20%">โครงการ</th><th style="width: 20%">กิจกรรม</th><th style="width: 12%">วันที่</th><th style="width: 10%">ประเภท</th><th style="width: 15%">รายละเอียด</th><th class="text-end pe-3" style="width: 15%">ยอดเงิน/สถานะ</th></tr>
+                    <tr>
+                      <th class="ps-3" style="width: 8%">ลำดับ</th>
+                      <th style="width: 30%">โครงการ</th>
+                      <th style="width: 30%">กิจกรรม</th>
+                      <th style="width: 15%">วันที่</th>
+                      <th class="text-end pe-3" style="width: 17%">ยอดเงิน/สถานะ</th>
+                    </tr>
                   </thead>
                   <tbody id="loanHistoryTable"></tbody>
                 </table>
