@@ -1,6 +1,6 @@
 var SPREADSHEET_ID = '1BhZDqEU7XKhgYgYnBrbFI7IMbr_SLdhU8rvhAMddodQ'; 
 var SHEET_NAME = 'm_actionplan';
-var APP_VERSION = '690128-1456'; 
+var APP_VERSION = '690129-1530'; 
 
 function doGet() {
   var template = HtmlService.createTemplateFromFile('index');
@@ -97,7 +97,7 @@ function getDashboardData() {
   } catch (e) { return { error: e.message }; }
 }
 
-// 3. SEARCH & YEARLY (DEPT ONLY)
+// 3. SEARCH & YEARLY
 function searchActionPlan(deptName) { 
     var result = getYearlyPlanData(deptName);
     var searchList = result.list.map(r => ({
@@ -137,6 +137,7 @@ function getYearlyPlanData(deptFilter) {
         var approved = (idxApproved > -1) ? parseNum(row[idxApproved]) : 0;
         var alloc = (idxAllocated > -1) ? parseNum(row[idxAllocated]) : 0;
         var spent = (idxSpent > -1) ? parseNum(row[idxSpent]) : 0;
+        var balance = alloc - spent; // Force Calc
         
         summary.projects++; summary.approved += approved; summary.allocated += alloc; summary.spent += spent;
         var timeline = monthIndices.map(idx => (idx > -1 && String(row[idx]).trim() !== '') ? 1 : 0);
@@ -146,7 +147,7 @@ function getYearlyPlanData(deptFilter) {
             project: (idxProject > -1) ? row[idxProject] : "-", 
             activity: actName, type: (idxType > -1) ? row[idxType] : "-", 
             budgetSource: (idxSource > -1) ? row[idxSource] : "-", 
-            timeline: timeline, allocated: alloc, spent: spent, balance: alloc - spent 
+            timeline: timeline, allocated: alloc, spent: spent, balance: balance 
         });
       }
     });
@@ -154,7 +155,7 @@ function getYearlyPlanData(deptFilter) {
   } catch (e) { return { error: e.message }; }
 }
 
-// 4. TRANSACTION & LOAN (SAVE)
+// 4. SAVE TX
 function saveTransaction(form) {
   var lock = LockService.getScriptLock();
   try {
@@ -183,6 +184,7 @@ function saveTransaction(form) {
   } catch (e) { return { status: 'error', message: e.message }; } finally { lock.releaseLock(); }
 }
 
+// 5. SAVE LOAN
 function saveLoan(form) {
   var lock = LockService.getScriptLock();
   try {
@@ -190,7 +192,11 @@ function saveLoan(form) {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     var mSheet = ss.getSheetByName('m_actionplan');
     var tSheet = ss.getSheetByName('t_loan'); 
-    if (!tSheet) { tSheet = ss.insertSheet('t_loan'); tSheet.appendRow(['Timestamp','ID','Year','Cat','Order','Dept','Plan','Project','Activity','Sub','Type','Source','Code','ActCode','Alloc','Loan','Date','Desc','Note','LoanType','Status','Paid','Bal','PayDate','Duration']);}
+    
+    if (!tSheet) { 
+        tSheet = ss.insertSheet('t_loan'); 
+        tSheet.appendRow(['Timestamp','ID','Year','Cat','Order','Dept','Plan','Project','Activity','Sub','Type','Source','Code','ActCode','Alloc','เงินยืม','วันที่ยืมเงิน','ประเภทเงินยืม','รายละเอียดการยืมเงิน','สถานะการเบิกจ่าย','จำนวนเบิกจ่าย','คงเหลือ','วันที่เบิกจ่าย','ระยะเวลาที่ยืม']);
+    }
 
     var mData = mSheet.getDataRange().getValues();
     var mHeaders = mData.shift();
@@ -209,11 +215,37 @@ function saveLoan(form) {
         mSheet.getRange(rowIndex + 2, idxLoan + 1).setValue(currentLoan);
     }
 
-    tSheet.appendRow([ new Date(), rowData[idxID], rowData[getIdx('ปีงบประมาณ')], rowData[getIdx('หมวด')], rowData[getIdx('ลำดับโครงการ')], rowData[getIdx('กลุ่มงาน/งาน')], rowData[getIdx('แผนงาน')], rowData[getIdx('โครงการ')], rowData[getIdx('กิจกรรมหลัก')], rowData[getIdx('กิจกรรมย่อย')], rowData[getIdx('ประเภทงบ')], rowData[getIdx('แหล่งงบประมาณ')], rowData[getIdx('รหัสงบประมาณ')], rowData[getIdx('รหัสกิจกรรม')], rowData[getIdx('จัดสรร')], amount, form.loanDate, form.desc, "", form.loanType, "ยังไม่ดำเนินการ", 0, amount, "", "" ]);
+    tSheet.appendRow([ 
+        new Date(),                         
+        rowData[idxID],                     
+        rowData[getIdx('ปีงบประมาณ')],       
+        rowData[getIdx('หมวด')],             
+        rowData[getIdx('ลำดับโครงการ')],      
+        rowData[getIdx('กลุ่มงาน/งาน')],      
+        rowData[getIdx('แผนงาน')],           
+        rowData[getIdx('โครงการ')],          
+        rowData[getIdx('กิจกรรมหลัก')],       
+        rowData[getIdx('กิจกรรมย่อย')],       
+        rowData[getIdx('ประเภทงบ')],         
+        rowData[getIdx('แหล่งงบประมาณ')],     
+        rowData[getIdx('รหัสงบประมาณ')],      
+        rowData[getIdx('รหัสกิจกรรม')],       
+        rowData[getIdx('จัดสรร')],           
+        amount,                             
+        form.loanDate,                      
+        form.loanType,                      
+        form.desc,                          
+        "ยังไม่ดำเนินการ",                   
+        0,                                  
+        amount,                             
+        "",                                 
+        ""                                  
+    ]);
     return { status: 'success', message: 'บันทึกเงินยืมเรียบร้อย' };
   } catch (e) { return { status: 'error', message: e.message }; } finally { lock.releaseLock(); }
 }
 
+// ** 5.1 UPDATE REPAYMENT (FIXED: U, W, X & Duration Calculation) **
 function updateLoanRepayment(form) {
   var lock = LockService.getScriptLock();
   try {
@@ -221,11 +253,13 @@ function updateLoanRepayment(form) {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     var tSheet = ss.getSheetByName('t_loan');
     var data = tSheet.getDataRange().getValues();
-    var headers = data[0];
     
-    var idxTime = headers.indexOf('Timestamp'); if(idxTime == -1) idxTime = 0; 
-    var idxLoanAmt = 15; var idxStatus = 20; var idxPaid = 21; var idxBal = 22; var idxPayDate = 23;
-
+    // Column Indices (1-based for getRange) matching the specific sheet structure
+    // T = 20 (Status), U = 21 (Paid), V = 22 (Bal), W = 23 (PayDate), X = 24 (Duration)
+    // Q = 17 (Loan Date - for calc)
+    // 0-based index for reading 'data': Loan Date = 16
+    
+    var idxTime = 0; // Timestamp
     var targetRow = -1;
     var targetTimestamp = new Date(form.timestamp).getTime();
 
@@ -235,15 +269,33 @@ function updateLoanRepayment(form) {
     }
     if (targetRow == -1) return {status:'error', message: 'ไม่พบรายการ'};
 
-    var loanAmount = parseFloat(data[targetRow-1][idxLoanAmt]) || 0;
+    // Read Data
+    var loanAmount = parseFloat(String(data[targetRow-1][15]).replace(/,/g,'')) || 0; // Col P (Index 15)
+    var loanDateRaw = data[targetRow-1][16]; // Col Q (Index 16)
+    
     var paidAmount = parseFloat(form.paidAmount) || 0;
     var balance = loanAmount - paidAmount;
-    var status = (balance <= 0) ? "คืนครบ" : "คืนบางส่วน";
+    
+    // Status Logic: เบิกจ่ายแล้ว if paid fully
+    var status = (balance <= 0) ? "เบิกจ่ายแล้ว" : "คืนบางส่วน";
 
-    tSheet.getRange(targetRow, idxStatus + 1).setValue(status);
-    tSheet.getRange(targetRow, idxPaid + 1).setValue(paidAmount);
-    tSheet.getRange(targetRow, idxBal + 1).setValue(balance);
-    tSheet.getRange(targetRow, idxPayDate + 1).setValue(form.payDate);
+    // Duration Logic (Col X)
+    var duration = "";
+    if (loanDateRaw && form.payDate) {
+        var loanDate = new Date(loanDateRaw);
+        var payDate = new Date(form.payDate);
+        if (!isNaN(loanDate.getTime()) && !isNaN(payDate.getTime())) {
+            var diffTime = payDate - loanDate;
+            duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Days
+        }
+    }
+
+    // UPDATE TARGET COLUMNS
+    tSheet.getRange(targetRow, 20).setValue(status);       // Col T: สถานะ
+    tSheet.getRange(targetRow, 21).setValue(paidAmount);   // Col U: จำนวนเบิกจ่าย
+    tSheet.getRange(targetRow, 22).setValue(balance);      // Col V: คงเหลือ
+    tSheet.getRange(targetRow, 23).setValue(form.payDate); // Col W: วันที่เบิกจ่าย
+    tSheet.getRange(targetRow, 24).setValue(duration);     // Col X: ระยะเวลา
 
     return { status: 'success', message: 'บันทึกคืนเงินเรียบร้อย' };
   } catch (e) { return { status: 'error', message: e.message }; } finally { lock.releaseLock(); }
@@ -251,10 +303,10 @@ function updateLoanRepayment(form) {
 
 // 6. HISTORY & SEARCH
 function getTransactionHistory() { return getHistory('t_actionplan', [4,7,8,9,15,17,18]); } 
-function getLoanHistory() { return getHistory('t_loan', [4,7,8,9,15,16,19,20,21,22,23]); }
+function getLoanHistory() { return getHistory('t_loan', [4,7,8,9, 15, 16, 17, 19, 20, 21, 22]); }
 
 function searchTransactionHistory(criteria) { return searchHistory('t_actionplan', criteria, [4,7,8,9,15,17,18]); }
-function searchLoanHistory(criteria) { return searchHistory('t_loan', criteria, [4,7,8,9,15,16,19,20,21,22,23]); }
+function searchLoanHistory(criteria) { return searchHistory('t_loan', criteria, [4,7,8,9, 15, 16, 17, 19, 20, 21, 22]); }
 
 function getHistory(sheetName, indices) {
   try {
@@ -265,23 +317,35 @@ function getHistory(sheetName, indices) {
     if (data.length < 2) return [];
 
     var result = [];
+    var parseAmount = (v) => parseFloat(String(v).replace(/,/g, '')) || 0;
+
     for (var i = data.length - 1; i >= 1; i--) { 
       var row = data[i];
-      if (row[indices[4]]) { 
-         var d = row[indices[5]]; var dateStr = (d instanceof Date) ? Utilities.formatDate(d, "Asia/Bangkok", "dd/MM/yyyy") : String(d);
+      if (row && row[0]) { 
+         var d = (indices[5] < row.length) ? row[indices[5]] : ""; 
+         var dateStr = "";
+         try {
+            dateStr = (d && d instanceof Date) ? Utilities.formatDate(d, "Asia/Bangkok", "dd/MM/yyyy") : String(d);
+         } catch(e) { dateStr = "-"; }
+
          var item = { 
-             order: row[indices[0]], project: row[indices[1]], activity: row[indices[2]], subActivity: row[indices[3]], 
-             amount: row[indices[4]], date: dateStr, type: row[indices[6]]
+             order: (indices[0] < row.length) ? row[indices[0]] : "-", 
+             project: (indices[1] < row.length) ? row[indices[1]] : "-", 
+             activity: (indices[2] < row.length) ? row[indices[2]] : "-", 
+             subActivity: (indices[3] < row.length) ? row[indices[3]] : "-", 
+             amount: (indices[4] < row.length) ? parseAmount(row[indices[4]]) : 0, 
+             date: dateStr, 
+             type: (indices[6] < row.length) ? row[indices[6]] : "-"
          };
          if(sheetName === 't_loan') {
              item.timestamp = (row[0] instanceof Date) ? row[0].toISOString() : "";
-             item.status = row[indices[7]] || 'ยังไม่ดำเนินการ';
-             item.paid = row[indices[8]] || 0;
-             item.balance = (row[indices[9]] !== "") ? row[indices[9]] : item.amount;
-             item.payDate = (row[indices[10]] && row[indices[10]] instanceof Date) ? Utilities.formatDate(row[indices[10]], "Asia/Bangkok", "dd/MM/yyyy") : '';
-             item.details = row[17]; 
+             item.status = (indices[7] < row.length) ? row[indices[7]] : "ยังไม่ดำเนินการ";
+             item.paid = (indices[8] < row.length) ? parseAmount(row[indices[8]]) : 0;
+             item.balance = (indices[9] < row.length && row[indices[9]] !== "") ? parseAmount(row[indices[9]]) : item.amount;
+             item.payDate = (indices[10] < row.length && row[indices[10]] && row[indices[10]] instanceof Date) ? Utilities.formatDate(row[indices[10]], "Asia/Bangkok", "dd/MM/yyyy") : '';
+             item.details = (18 < row.length) ? row[18] : ""; 
          }
-         result.push(item);
+         if(item.amount > 0 || item.order !== "-") { result.push(item); }
       }
       if (result.length >= 10) break;
     }
@@ -297,27 +361,40 @@ function searchHistory(sheetName, criteria, indices) {
     var data = tSheet.getDataRange().getValues();
     
     var result = [];
+    var parseAmount = (v) => parseFloat(String(v).replace(/,/g, '')) || 0;
+
     for(var i=1; i<data.length; i++) {
         var row = data[i];
-        
-        var matchOrder = true; if(criteria.order && String(row[indices[0]]) !== String(criteria.order)) matchOrder = false;
-        var matchProj = true; if(criteria.project && String(row[indices[1]]) !== String(criteria.project)) matchProj = false;
-        var matchAct = true; if(criteria.activity && String(row[indices[2]]) !== String(criteria.activity)) matchAct = false;
-        var matchSub = true; if(criteria.subActivity && String(row[indices[3]]).toLowerCase().indexOf(String(criteria.subActivity).toLowerCase()) === -1) matchSub = false;
+        if (!row) continue;
+
+        var matchOrder = true; if(criteria.order && String(row[indices[0]] || "") !== String(criteria.order)) matchOrder = false;
+        var matchProj = true; if(criteria.project && String(row[indices[1]] || "") !== String(criteria.project)) matchProj = false;
+        var matchAct = true; if(criteria.activity && String(row[indices[2]] || "") !== String(criteria.activity)) matchAct = false;
+        var matchSub = true; if(criteria.subActivity && String(row[indices[3]] || "").toLowerCase().indexOf(String(criteria.subActivity).toLowerCase()) === -1) matchSub = false;
 
         if (matchOrder && matchProj && matchAct && matchSub) {
-             var d = row[indices[5]]; var dateStr = (d instanceof Date) ? Utilities.formatDate(d, "Asia/Bangkok", "dd/MM/yyyy") : String(d);
+             var d = (indices[5] < row.length) ? row[indices[5]] : ""; 
+             var dateStr = "";
+             try {
+                dateStr = (d && d instanceof Date) ? Utilities.formatDate(d, "Asia/Bangkok", "dd/MM/yyyy") : String(d);
+             } catch(e) { dateStr = "-"; }
+
              var item = { 
-                 order: row[indices[0]], project: row[indices[1]], activity: row[indices[2]], subActivity: row[indices[3]], 
-                 amount: row[indices[4]], date: dateStr, type: row[indices[6]]
+                 order: (indices[0] < row.length) ? row[indices[0]] : "-", 
+                 project: (indices[1] < row.length) ? row[indices[1]] : "-", 
+                 activity: (indices[2] < row.length) ? row[indices[2]] : "-", 
+                 subActivity: (indices[3] < row.length) ? row[indices[3]] : "-", 
+                 amount: (indices[4] < row.length) ? parseAmount(row[indices[4]]) : 0, 
+                 date: dateStr, 
+                 type: (indices[6] < row.length) ? row[indices[6]] : "-"
              };
              if(sheetName === 't_loan') {
                  item.timestamp = (row[0] instanceof Date) ? row[0].toISOString() : "";
-                 item.status = row[indices[7]] || 'ยังไม่ดำเนินการ';
-                 item.paid = row[indices[8]] || 0;
-                 item.balance = (row[indices[9]] !== "") ? row[indices[9]] : item.amount;
-                 item.payDate = (row[indices[10]] && row[indices[10]] instanceof Date) ? Utilities.formatDate(row[indices[10]], "Asia/Bangkok", "dd/MM/yyyy") : '';
-                 item.details = row[17];
+                 item.status = (indices[7] < row.length) ? row[indices[7]] : "ยังไม่ดำเนินการ";
+                 item.paid = (indices[8] < row.length) ? parseAmount(row[indices[8]]) : 0;
+                 item.balance = (indices[9] < row.length && row[indices[9]] !== "") ? parseAmount(row[indices[9]]) : item.amount;
+                 item.payDate = (indices[10] < row.length && row[indices[10]] && row[indices[10]] instanceof Date) ? Utilities.formatDate(row[indices[10]], "Asia/Bangkok", "dd/MM/yyyy") : '';
+                 item.details = (18 < row.length) ? row[18] : "";
              }
              result.push(item);
         }
