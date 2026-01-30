@@ -168,20 +168,117 @@
   function renderGauge(canvasId, stats) { var alloc = stats.allocated || 0; var spent = stats.spent || 0; var percent = alloc > 0 ? (spent / alloc) * 100 : 0; $('#' + canvasId + 'Text').text(percent.toFixed(2) + '%'); new Chart(document.getElementById(canvasId), { type: 'doughnut', data: { labels: ['เบิกจ่าย', 'คงเหลือ'], datasets: [{ data: [percent, 100 - percent], backgroundColor: ['#dc3545', '#e9ecef'], borderWidth: 0, hoverOffset: 0 }] }, options: { responsive: true, maintainAspectRatio: false, rotation: -90, circumference: 180, cutout: '80%', plugins: { legend: {display:false}, tooltip: {enabled:false} } } }); }
   function renderBarChart(canvasId, deptStats, colorTheme) { var chartData = []; for (var dept in deptStats) { var alloc = deptStats[dept].allocated; var spent = deptStats[dept].spent; var pct = alloc > 0 ? (spent / alloc) * 100 : 0; if(alloc > 0) chartData.push({ label: dept, y: pct }); } chartData.sort((a, b) => b.y - a.y); new Chart(document.getElementById(canvasId), { type: 'bar', data: { labels: chartData.map(d => d.label), datasets: [{ data: chartData.map(d => d.y), backgroundColor: colorTheme, borderRadius: 4, barPercentage: 0.6 }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'x', plugins: { legend: {display:false}, tooltip: { callbacks: { label: (c) => c.raw.toFixed(2) + '%' } } }, scales: { y: { beginAtZero: true, max: 100, ticks: { callback: (v) => v + "%" } }, x: { grid: {display:false} } } } }); }
   
+  // 1. ฟังก์ชันค้นหาหน้า "สืบค้นแผนปฏิบัติ" (Search Page)
+  function runSearch() { 
+      var dept = $('#searchDeptSelect').val();
+      var type = $('#searchType').val();
+      var quarter = $('#searchQuarter').val();
+      var month = $('#searchMonth').val();
+
+      // Reset table to loading
+      if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().destroy(); }
+      $('#searchTableBody').html('<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>');
+      
+      // ส่ง Parameter 4 ตัว
+      google.script.run.withSuccessHandler(renderSearchPage).searchActionPlan(dept, type, quarter, month); 
+  }
+
+  function resetSearch() { 
+      $('#searchDeptSelect').val('').trigger('change'); 
+      $('#searchType').val('');
+      $('#searchQuarter').val('');
+      $('#searchMonth').val('');
+      
+      $('#sum-count').text('0');
+      $('#sum-approved').text('0.00');
+      $('#sum-allocated').text('0.00');
+
+      if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().clear().destroy(); }
+      $('#searchTableBody').empty(); 
+  }
+
   // FIX: Ensure colspan=8 matches HTML header
-  function runSearch() { var dept = $('#searchDeptSelect').val(); $('#searchTableBody').html('<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>'); google.script.run.withSuccessHandler(renderSearchPage).searchActionPlan(dept); }
+  // function runSearch() { 
+  //   var dept = $('#searchDeptSelect').val(); 
+  //   $('#searchTableBody').html('<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>'); 
+  //   google.script.run.withSuccessHandler(renderSearchPage).searchActionPlan(dept); 
+  //   }
   
-  function resetSearch() { $('#searchDeptSelect').val('').trigger('change'); $('#searchTableBody').empty(); }
+  // 1. แก้ไขฟังก์ชันล้างค่าหน้า "สืบค้นแผนปฏิบัติ" (Search Page)
+  // function resetSearch() { 
+  //     // ล้างค่า Dropdown
+  //     $('#searchDeptSelect').val('').trigger('change'); 
+      
+  //     // ล้างค่าตัวเลขบนการ์ดสรุป
+  //     $('#sum-count').text('0');
+  //     $('#sum-approved').text('0.00');
+  //     $('#sum-allocated').text('0.00');
+
+  //     // FIX: ตรวจสอบและทำลาย DataTable เพื่อลบ Pagination และ Search Box ทิ้ง
+  //     if ($.fn.DataTable.isDataTable('#searchTable')) {
+  //         $('#searchTable').DataTable().clear().destroy();
+  //     }
+      
+  //     // ล้างข้อมูลใน Body ให้เกลี้ยง
+  //     $('#searchTableBody').empty(); 
+  // }
+
   
   // FIX: Render 8 columns
   function renderSearchPage(data) { if(data.error) { $('#searchTableBody').html('<tr><td colspan="8" class="text-danger">'+data.error+'</td></tr>'); return; } var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2}); $('#sum-count').text(Number(data.summary.count).toLocaleString()); $('#sum-approved').text(fmt(data.summary.approved)); $('#sum-allocated').text(fmt(data.summary.allocated)); if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().destroy(); } var tbody = $('#searchTableBody'); tbody.empty(); data.list.forEach(function(row) { var timelineHtml = getTimelineDisplayHtml(row.timeline); tbody.append(`<tr><td class="ps-3">${row.order}</td><td><span class="badge bg-light text-dark border">${row.dept}</span></td><td><div class="fw-bold text-wrap">${row.project}</div><div class="small text-muted">${row.activity}</div></td><td><span class="badge bg-secondary fw-normal">${row.budgetType}</span></td><td><span class="badge bg-info text-dark fw-normal">${row.budgetSource}</span></td><td class="text-center text-nowrap">${timelineHtml}</td><td class="text-end text-primary">${fmt(row.approved)}</td><td class="text-end fw-bold text-success">${fmt(row.allocated)}</td></tr>`); }); $('#searchTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] }); }
   
   function initYearlyPage() { /*...*/ } 
   
+  // 2. ฟังก์ชันค้นหาหน้า "แผนงานประจำปี" (Yearly Page)
+  function loadYearlyData() { 
+      var dept = $('#yearlyDeptSelect').val();
+      var type = $('#yearlyType').val();
+      var quarter = $('#yearlyQuarter').val();
+      var month = $('#yearlyMonth').val();
+
+      if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().destroy(); }
+      $('#yearlyTableBody').html('<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>');
+      
+      // ส่ง Parameter 4 ตัว
+      google.script.run.withSuccessHandler(renderYearlyPage).getYearlyPlanData(dept, type, quarter, month); 
+  }
+
+  function resetYearly() { 
+      $('#yearlyDeptSelect').val('').trigger('change');
+      $('#yearlyType').val('');
+      $('#yearlyQuarter').val('');
+      $('#yearlyMonth').val(''); 
+      
+      $('#yp-count').text('0');
+      $('#yp-approved').text('0.00');
+      $('#yp-allocated').text('0.00');
+
+      if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().clear().destroy(); }
+      $('#yearlyTableBody').empty(); 
+  }
+
   // FIX: Ensure colspan=9 matches HTML header
-  function loadYearlyData() { var dept = $('#yearlyDeptSelect').val(); $('#yearlyTableBody').html('<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>'); google.script.run.withSuccessHandler(renderYearlyPage).getYearlyPlanData(dept); }
+//   function loadYearlyData() { var dept = $('#yearlyDeptSelect').val(); $('#yearlyTableBody').html('<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>'); google.script.run.withSuccessHandler(renderYearlyPage).getYearlyPlanData(dept); }
   
-  function resetYearly() { $('#yearlyDeptSelect').val('').trigger('change'); $('#yearlyTableBody').empty(); }
+// // ฟังก์ชันล้างค่าหน้า "แผนงานประจำปี" (Yearly Page)
+//   function resetYearly() { 
+//       // ล้างค่า Dropdown
+//       $('#yearlyDeptSelect').val('').trigger('change'); 
+      
+//       // ล้างค่าตัวเลขบนการ์ดสรุป
+//       $('#yp-count').text('0');
+//       $('#yp-approved').text('0.00');
+//       $('#yp-allocated').text('0.00');
+
+//       // FIX: ตรวจสอบและทำลาย DataTable เพื่อลบ Pagination และ Search Box ทิ้ง
+//       if ($.fn.DataTable.isDataTable('#yearlyTable')) {
+//           $('#yearlyTable').DataTable().clear().destroy();
+//       }
+      
+//       // ล้างข้อมูลใน Body ให้เกลี้ยง
+//       $('#yearlyTableBody').empty(); 
+//   }
+
   
   // FIX: Render 9 columns
   function renderYearlyPage(data) { if(data.error) { $('#yearlyTableBody').html('<tr><td colspan="9" class="text-danger">'+data.error+'</td></tr>'); return; } var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2}); $('#yp-count').text(Number(data.summary.projects).toLocaleString()); $('#yp-approved').text(fmt(data.summary.approved)); $('#yp-allocated').text(fmt(data.summary.allocated)); if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().destroy(); } var tbody = $('#yearlyTableBody'); tbody.empty(); data.list.forEach(row => { var timelineHtml = getTimelineDisplayHtml(row.timeline); tbody.append(`<tr><td class="ps-3">${row.order}</td><td><span class="badge bg-light text-dark border">${row.dept}</span></td><td><div class="fw-bold text-wrap" style="font-size: 1rem;">${row.project}</div><div class="small text-muted mt-1"><i class="fas fa-tasks me-1"></i>${row.activity}</div></td><td><span class="badge bg-secondary fw-normal">${row.type}</span></td><td><span class="badge bg-info text-dark fw-normal">${row.budgetSource}</span></td><td class="text-center text-nowrap">${timelineHtml}</td><td class="text-end">${fmt(row.allocated)}</td><td class="text-end">${fmt(row.spent)}</td><td class="text-end pe-3 fw-bold ${row.balance < 0 ? 'text-danger':'text-success'}">${fmt(row.balance)}</td></tr>`); }); $('#yearlyTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] }); }
