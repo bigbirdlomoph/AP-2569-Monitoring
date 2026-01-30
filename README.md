@@ -2,6 +2,7 @@
 ✅ Dashboard: </br>
 ✅ สืบค้นแผนปฏิบัติ : OK </br>
 ✅ แผนงานประจำปี : OK </br>
+✅ รายงานสรุป : OK </br>
 ✅ ธุรกรรม : เบิกจ่าย OK </br>
        - ฟอร์มบันทึกเบิกจ่าย OK </br>
        - ประวัติการเบิกจ่าย OK </br>
@@ -11,6 +12,8 @@
        - บันทึกการคืนเงินยืม </br>
 
 Dashboard
+![2026-01-30_16-05-49](https://github.com/user-attachments/assets/cb11a827-2edb-467b-ba4d-1f88980ae43b)
+
 <img width="1897" height="2042" alt="image" src="https://github.com/user-attachments/assets/679572a1-acc0-4807-8840-55c97d94d1ae" />
 
 สืบค้นแผนปฏิบัติ
