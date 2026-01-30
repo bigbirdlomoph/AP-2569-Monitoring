@@ -175,11 +175,10 @@
       var quarter = $('#searchQuarter').val();
       var month = $('#searchMonth').val();
 
-      // Reset table to loading
       if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().destroy(); }
-      $('#searchTableBody').html('<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>');
+      // แก้ไข colspan เป็น 7 (เพราะรวมคอลัมน์แล้ว)
+      $('#searchTableBody').html('<tr><td colspan="7" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>');
       
-      // ส่ง Parameter 4 ตัว
       google.script.run.withSuccessHandler(renderSearchPage).searchActionPlan(dept, type, quarter, month); 
   }
 
@@ -197,35 +196,39 @@
       $('#searchTableBody').empty(); 
   }
 
-  // FIX: Ensure colspan=8 matches HTML header
-  // function runSearch() { 
-  //   var dept = $('#searchDeptSelect').val(); 
-  //   $('#searchTableBody').html('<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>'); 
-  //   google.script.run.withSuccessHandler(renderSearchPage).searchActionPlan(dept); 
-  //   }
   
-  // 1. แก้ไขฟังก์ชันล้างค่าหน้า "สืบค้นแผนปฏิบัติ" (Search Page)
-  // function resetSearch() { 
-  //     // ล้างค่า Dropdown
-  //     $('#searchDeptSelect').val('').trigger('change'); 
+  // Merge ประเภทงบ/แหล่งงบ
+  function renderSearchPage(data) { 
+      if(data.error) { 
+          // แก้ไข colspan เป็น 7
+          $('#searchTableBody').html('<tr><td colspan="7" class="text-danger">'+data.error+'</td></tr>'); 
+          return; 
+      } 
+      var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2}); 
+      $('#sum-count').text(Number(data.summary.count).toLocaleString()); 
+      $('#sum-approved').text(fmt(data.summary.approved)); 
+      $('#sum-allocated').text(fmt(data.summary.allocated)); 
       
-  //     // ล้างค่าตัวเลขบนการ์ดสรุป
-  //     $('#sum-count').text('0');
-  //     $('#sum-approved').text('0.00');
-  //     $('#sum-allocated').text('0.00');
-
-  //     // FIX: ตรวจสอบและทำลาย DataTable เพื่อลบ Pagination และ Search Box ทิ้ง
-  //     if ($.fn.DataTable.isDataTable('#searchTable')) {
-  //         $('#searchTable').DataTable().clear().destroy();
-  //     }
+      if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().destroy(); } 
+      var tbody = $('#searchTableBody'); 
+      tbody.empty(); 
       
-  //     // ล้างข้อมูลใน Body ให้เกลี้ยง
-  //     $('#searchTableBody').empty(); 
-  // }
-
-  
-  // FIX: Render 8 columns
-  function renderSearchPage(data) { if(data.error) { $('#searchTableBody').html('<tr><td colspan="8" class="text-danger">'+data.error+'</td></tr>'); return; } var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2}); $('#sum-count').text(Number(data.summary.count).toLocaleString()); $('#sum-approved').text(fmt(data.summary.approved)); $('#sum-allocated').text(fmt(data.summary.allocated)); if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().destroy(); } var tbody = $('#searchTableBody'); tbody.empty(); data.list.forEach(function(row) { var timelineHtml = getTimelineDisplayHtml(row.timeline); tbody.append(`<tr><td class="ps-3">${row.order}</td><td><span class="badge bg-light text-dark border">${row.dept}</span></td><td><div class="fw-bold text-wrap">${row.project}</div><div class="small text-muted">${row.activity}</div></td><td><span class="badge bg-secondary fw-normal">${row.budgetType}</span></td><td><span class="badge bg-info text-dark fw-normal">${row.budgetSource}</span></td><td class="text-center text-nowrap">${timelineHtml}</td><td class="text-end text-primary">${fmt(row.approved)}</td><td class="text-end fw-bold text-success">${fmt(row.allocated)}</td></tr>`); }); $('#searchTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] }); }
+      data.list.forEach(function(row) { 
+          var timelineHtml = getTimelineDisplayHtml(row.timeline); 
+          // แก้ไข: รวม budgetType และ budgetSource ใน span เดียว
+          tbody.append(`<tr>
+              <td class="ps-3">${row.order}</td>
+              <td><span class="badge bg-light text-dark border">${row.dept}</span></td>
+              <td><div class="fw-bold text-wrap">${row.project}</div><div class="small text-muted">${row.activity}</div></td>
+              <td><span class="badge bg-white text-dark border border-secondary text-wrap" style="line-height: 1.4;">${row.budgetType} / ${row.budgetSource}</span></td>
+              <td class="text-center text-nowrap">${timelineHtml}</td>
+              <td class="text-end text-primary">${fmt(row.approved)}</td>
+              <td class="text-end fw-bold text-success">${fmt(row.allocated)}</td>
+          </tr>`); 
+      }); 
+      
+      $('#searchTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] }); 
+  }
   
   function initYearlyPage() { /*...*/ } 
   
@@ -237,9 +240,9 @@
       var month = $('#yearlyMonth').val();
 
       if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().destroy(); }
-      $('#yearlyTableBody').html('<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>');
+      // แก้ไข colspan เป็น 8 (เพราะรวมคอลัมน์แล้ว)
+      $('#yearlyTableBody').html('<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>');
       
-      // ส่ง Parameter 4 ตัว
       google.script.run.withSuccessHandler(renderYearlyPage).getYearlyPlanData(dept, type, quarter, month); 
   }
 
@@ -280,8 +283,39 @@
 //   }
 
   
-  // FIX: Render 9 columns
-  function renderYearlyPage(data) { if(data.error) { $('#yearlyTableBody').html('<tr><td colspan="9" class="text-danger">'+data.error+'</td></tr>'); return; } var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2}); $('#yp-count').text(Number(data.summary.projects).toLocaleString()); $('#yp-approved').text(fmt(data.summary.approved)); $('#yp-allocated').text(fmt(data.summary.allocated)); if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().destroy(); } var tbody = $('#yearlyTableBody'); tbody.empty(); data.list.forEach(row => { var timelineHtml = getTimelineDisplayHtml(row.timeline); tbody.append(`<tr><td class="ps-3">${row.order}</td><td><span class="badge bg-light text-dark border">${row.dept}</span></td><td><div class="fw-bold text-wrap" style="font-size: 1rem;">${row.project}</div><div class="small text-muted mt-1"><i class="fas fa-tasks me-1"></i>${row.activity}</div></td><td><span class="badge bg-secondary fw-normal">${row.type}</span></td><td><span class="badge bg-info text-dark fw-normal">${row.budgetSource}</span></td><td class="text-center text-nowrap">${timelineHtml}</td><td class="text-end">${fmt(row.allocated)}</td><td class="text-end">${fmt(row.spent)}</td><td class="text-end pe-3 fw-bold ${row.balance < 0 ? 'text-danger':'text-success'}">${fmt(row.balance)}</td></tr>`); }); $('#yearlyTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] }); }
+  // FIX: Merge column ประเภทงบ/แหล่งงบ
+  function renderYearlyPage(data) { 
+      if(data.error) { 
+          // แก้ไข colspan เป็น 8
+          $('#yearlyTableBody').html('<tr><td colspan="8" class="text-danger">'+data.error+'</td></tr>'); 
+          return; 
+      } 
+      var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2}); 
+      $('#yp-count').text(Number(data.summary.projects).toLocaleString()); 
+      $('#yp-approved').text(fmt(data.summary.approved)); 
+      $('#yp-allocated').text(fmt(data.summary.allocated)); 
+      
+      if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().destroy(); } 
+      var tbody = $('#yearlyTableBody'); 
+      tbody.empty(); 
+      
+      data.list.forEach(row => { 
+          var timelineHtml = getTimelineDisplayHtml(row.timeline); 
+          // แก้ไข: รวม type และ budgetSource ใน span เดียว
+          tbody.append(`<tr>
+              <td class="ps-3">${row.order}</td>
+              <td><span class="badge bg-light text-dark border">${row.dept}</span></td>
+              <td><div class="fw-bold text-wrap" style="font-size: 1rem;">${row.project}</div><div class="small text-muted mt-1"><i class="fas fa-tasks me-1"></i>${row.activity}</div></td>
+              <td><span class="badge bg-white text-dark border border-secondary text-wrap" style="line-height: 1.4;">${row.type} / ${row.budgetSource}</span></td>
+              <td class="text-center text-nowrap">${timelineHtml}</td>
+              <td class="text-end">${fmt(row.allocated)}</td>
+              <td class="text-end">${fmt(row.spent)}</td>
+              <td class="text-end pe-3 fw-bold ${row.balance < 0 ? 'text-danger':'text-success'}">${fmt(row.balance)}</td>
+          </tr>`); 
+      }); 
+      
+      $('#yearlyTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] }); 
+  }
   
   function onTxOrderChange() { var order = $('#txOrder').val(); var select = $('#txActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>'); $('#divTxSubActivity').addClass('d-none'); $('#txSubActivity').empty(); $('#txInfoBox').addClass('d-none'); if(!order) { select.trigger('change').prop('disabled', true); $('#txProjectInfo').addClass('d-none'); return; } var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order)); if (rows.length > 0) { $('#tx_disp_proj').text(rows[0].project); $('#tx_disp_dept').text(rows[0].dept); $('#txProjectInfo').removeClass('d-none'); var activities = [...new Set(rows.map(r => r.activity))].sort(); activities.forEach(act => { select.append(`<option value="${act}">${act}</option>`); }); select.trigger('change').prop('disabled', false); } }
   function onTxActivityChange() { var order = $('#txOrder').val(); var actName = $('#txActivity').val(); var subSelect = $('#txSubActivity').empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>'); $('#divTxSubActivity').addClass('d-none'); $('#txInfoBox').addClass('d-none'); if (!actName) return; var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order) && r.activity === actName); var subActivities = rows.filter(r => r.subActivity).map(r => r.subActivity); if (subActivities.length > 0) { subActivities.forEach(sub => { var row = rows.find(r => r.subActivity === sub); subSelect.append(`<option value="${sub}" data-id="${row.id}" data-alloc="${row.allocated}" data-bal="${row.balance}" data-proj="${row.project}" data-dept="${row.dept}" data-order="${row.order}">${sub}</option>`); }); $('#divTxSubActivity').removeClass('d-none'); } else { var row = rows[0]; if (row) updateTxInfoBox(row.allocated, row.balance, row.id); } }
