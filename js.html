@@ -1,14 +1,133 @@
 <script>
   var CACHED_OPTIONS = null;
+  // Global Chart Instances (เพื่อ Destroy ก่อนวาดใหม่)
+  var summaryPieChart = null;
+  var summaryBarChart = null;
 
   function switchPage(pageId, element) {
     $('.page-section').addClass('d-none');
     $('#' + pageId + '-page').removeClass('d-none');
     $('.nav-pill-btn').removeClass('active');
     if(element) $(element).addClass('active');
+    
+    // Add Summary Logic
+    if (pageId === 'summary') { loadSummary(); }
+    
     if (pageId === 'transaction') { document.getElementById('txDate').valueAsDate = new Date(); loadTxHistory(); }
     if (pageId === 'loan') { document.getElementById('loanDate').valueAsDate = new Date(); loadLoanHistory(); }
     if (pageId === 'yearly') initYearlyPage();
+  }
+
+  // --- SUMMARY PAGE LOGIC ---
+  function loadSummary() {
+      var q = $('#sumQuarter').val();
+      var m = $('#sumMonth').val();
+      
+      // Show Loading
+      $('#s-total-alloc').html('<i class="fas fa-spinner fa-spin"></i>');
+      
+      google.script.run.withSuccessHandler(renderSummaryPage).getSummaryData(q, m);
+  }
+
+  function renderSummaryPage(data) {
+      if(data.error) { Swal.fire('Error', data.error, 'error'); return; }
+      
+      var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
+      
+      // 1. Update Scorecards
+      $('#s-total-alloc').text(fmt(data.grandTotal.allocated));
+      $('#s-total-spent').text(fmt(data.grandTotal.spent));
+      $('#s-total-bal').text(fmt(data.grandTotal.allocated - data.grandTotal.spent));
+      
+      var pct = (data.grandTotal.allocated > 0) ? (data.grandTotal.spent / data.grandTotal.allocated * 100) : 0;
+      $('#s-total-pct').text(pct.toFixed(2) + '%');
+
+      // 2. Render Charts
+      renderSummaryCharts(data);
+
+      // 3. Render Table 1: Source
+      var tSource = $('#tableSourceBody').empty();
+      data.bySource.forEach(s => {
+          var bal = s.allocated - s.spent;
+          var p = (s.allocated > 0) ? (s.spent / s.allocated * 100) : 0;
+          var badgeColor = (p >= 80) ? 'bg-success' : (p >= 50 ? 'bg-warning text-dark' : 'bg-danger');
+          
+          tSource.append(`<tr>
+              <td class="ps-4 fw-bold">${s.name}</td>
+              <td class="text-center">${s.count}</td>
+              <td class="text-end text-primary">${fmt(s.allocated)}</td>
+              <td class="text-end text-danger">${fmt(s.spent)}</td>
+              <td class="text-center"><span class="badge ${badgeColor}">${p.toFixed(2)}%</span></td>
+              <td class="text-end pe-4 fw-bold">${fmt(bal)}</td>
+          </tr>`);
+      });
+
+      // 4. Render Table 2: Dept
+      var tDept = $('#tableDeptBody').empty();
+      data.byDept.forEach(d => {
+          var bal = d.allocated - d.spent;
+          var p = (d.allocated > 0) ? (d.spent / d.allocated * 100) : 0;
+          var colorClass = (p >= 80) ? 'bg-success' : (p >= 50 ? 'bg-warning' : 'bg-danger');
+          
+          tDept.append(`<tr>
+              <td class="ps-4">${d.name}</td>
+              <td class="text-center">${d.count}</td>
+              <td class="text-end">${fmt(d.allocated)}</td>
+              <td class="text-end">${fmt(d.spent)}</td>
+              <td class="align-middle px-3">
+                  <div class="progress" style="height: 20px;">
+                      <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${p}%">${p.toFixed(1)}%</div>
+                  </div>
+              </td>
+              <td class="text-end pe-4 fw-bold ${bal < 0 ? 'text-danger' : 'text-success'}">${fmt(bal)}</td>
+          </tr>`);
+      });
+  }
+
+  function renderSummaryCharts(data) {
+      // Pie Chart (Source)
+      if (summaryPieChart) summaryPieChart.destroy();
+      var ctxPie = document.getElementById('chartSource').getContext('2d');
+      summaryPieChart = new Chart(ctxPie, {
+          type: 'doughnut',
+          data: {
+              labels: data.bySource.map(s => s.name),
+              datasets: [{
+                  data: data.bySource.map(s => s.allocated),
+                  backgroundColor: ['#0d6efd', '#fd7e14', '#20c997', '#ffc107'],
+                  borderWidth: 1
+              }]
+          },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+      });
+
+      // Bar Chart (Top 5 Dept)
+      if (summaryBarChart) summaryBarChart.destroy();
+      var top5 = data.byDept.slice(0, 5); // Take top 5
+      var ctxBar = document.getElementById('chartTopDept').getContext('2d');
+      summaryBarChart = new Chart(ctxBar, {
+          type: 'bar',
+          data: {
+              labels: top5.map(d => d.name.substring(0, 15) + '...'), // Shorten name
+              datasets: [{
+                  label: 'งบจัดสรร',
+                  data: top5.map(d => d.allocated),
+                  backgroundColor: '#198754',
+                  borderRadius: 4
+              }, {
+                  label: 'เบิกจ่าย',
+                  data: top5.map(d => d.spent),
+                  backgroundColor: '#dc3545',
+                  borderRadius: 4
+              }]
+          },
+          options: { 
+              responsive: true, 
+              maintainAspectRatio: false, 
+              indexAxis: 'y', // Horizontal Bar
+              scales: { x: { beginAtZero: true } } 
+          }
+      });
   }
 
   $(document).ready(function() {
