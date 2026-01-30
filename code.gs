@@ -1,6 +1,6 @@
 var SPREADSHEET_ID = '1BhZDqEU7XKhgYgYnBrbFI7IMbr_SLdhU8rvhAMddodQ'; 
 var SHEET_NAME = 'm_actionplan';
-var APP_VERSION = '690129-1530'; 
+var APP_VERSION = '690130-1200'; 
 
 function doGet() {
   var template = HtmlService.createTemplateFromFile('index');
@@ -98,8 +98,68 @@ function getDashboardData() {
 }
 
 // 3. SEARCH & YEARLY
-function searchActionPlan(deptName) { 
-    var result = getYearlyPlanData(deptName);
+// function searchActionPlan(deptName) { 
+//     var result = getYearlyPlanData(deptName);
+//     var searchList = result.list.map(r => ({
+//         order: r.order, dept: r.dept, project: r.project, activity: r.activity,
+//         budgetType: r.type, budgetSource: r.budgetSource, timeline: r.timeline,
+//         approved: 0, allocated: r.allocated 
+//     }));
+//     return { summary: {count: result.summary.projects, approved: result.summary.approved, allocated: result.summary.allocated}, list: searchList };
+// }
+
+// function getYearlyPlanData(deptFilter) {
+//   try {
+//     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+//     var sheet = ss.getSheetByName(SHEET_NAME);
+//     if (!sheet) return { summary: { projects: 0 }, list: [] };
+    
+//     var data = sheet.getDataRange().getValues();
+//     var headers = data.shift();
+//     var getIdx = (name) => headers.findIndex(h => String(h).trim() === name);
+    
+//     var idxOrder = getIdx('ลำดับโครงการ'); var idxDept = getIdx('กลุ่มงาน/งาน'); var idxProject = getIdx('โครงการ');
+//     var idxActivity = getIdx('กิจกรรมหลัก'); var idxSub = getIdx('กิจกรรมย่อย'); var idxType = getIdx('ประเภทงบ');
+//     var idxSource = getIdx('แหล่งงบประมาณ'); var idxApproved = getIdx('อนุมัติตามแผน'); var idxAllocated = getIdx('จัดสรร');
+//     var idxSpent = getIdx('เบิกจ่าย');
+    
+//     var monthIndices = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'].map(m => getIdx(m));
+//     var summary = { projects: 0, approved: 0, allocated: 0, spent: 0 };
+//     var list = [];
+//     var parseNum = (val) => { var v = parseFloat(String(val).replace(/,/g, '')); return isNaN(v) ? 0 : v; };
+
+//     data.forEach(row => {
+//       var rowDept = (idxDept > -1) ? String(row[idxDept]).trim() : "";
+//       if (deptFilter === "" || rowDept === deptFilter) {
+//         var actName = (idxActivity > -1) ? row[idxActivity] : "";
+//         if (idxSub > -1 && row[idxSub]) { actName += " (" + row[idxSub] + ")"; }
+        
+//         var approved = (idxApproved > -1) ? parseNum(row[idxApproved]) : 0;
+//         var alloc = (idxAllocated > -1) ? parseNum(row[idxAllocated]) : 0;
+//         var spent = (idxSpent > -1) ? parseNum(row[idxSpent]) : 0;
+//         var balance = alloc - spent; // Force Calc
+        
+//         summary.projects++; summary.approved += approved; summary.allocated += alloc; summary.spent += spent;
+//         var timeline = monthIndices.map(idx => (idx > -1 && String(row[idx]).trim() !== '') ? 1 : 0);
+        
+//         list.push({ 
+//             order: (idxOrder > -1) ? row[idxOrder] : "-", dept: rowDept, 
+//             project: (idxProject > -1) ? row[idxProject] : "-", 
+//             activity: actName, type: (idxType > -1) ? row[idxType] : "-", 
+//             budgetSource: (idxSource > -1) ? row[idxSource] : "-", 
+//             timeline: timeline, allocated: alloc, spent: spent, balance: balance 
+//         });
+//       }
+//     });
+//     return { summary: summary, list: list };
+//   } catch (e) { return { error: e.message }; }
+// }
+
+// ... (ส่วนต้นไฟล์คงเดิม) ... 30-01-2569
+
+// 3. SEARCH & YEARLY (UPDATED WITH ADVANCED FILTERS)
+function searchActionPlan(dept, budgetType, quarter, month) { 
+    var result = getYearlyPlanData(dept, budgetType, quarter, month);
     var searchList = result.list.map(r => ({
         order: r.order, dept: r.dept, project: r.project, activity: r.activity,
         budgetType: r.type, budgetSource: r.budgetSource, timeline: r.timeline,
@@ -108,7 +168,7 @@ function searchActionPlan(deptName) {
     return { summary: {count: result.summary.projects, approved: result.summary.approved, allocated: result.summary.allocated}, list: searchList };
 }
 
-function getYearlyPlanData(deptFilter) {
+function getYearlyPlanData(deptFilter, typeFilter, quarterFilter, monthFilter) {
   try {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     var sheet = ss.getSheetByName(SHEET_NAME);
@@ -124,23 +184,51 @@ function getYearlyPlanData(deptFilter) {
     var idxSpent = getIdx('เบิกจ่าย');
     
     var monthIndices = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'].map(m => getIdx(m));
+    var quarters = {
+        'Q1': [0, 1, 2], 'Q2': [3, 4, 5], 'Q3': [6, 7, 8], 'Q4': [9, 10, 11]
+    };
+
     var summary = { projects: 0, approved: 0, allocated: 0, spent: 0 };
     var list = [];
     var parseNum = (val) => { var v = parseFloat(String(val).replace(/,/g, '')); return isNaN(v) ? 0 : v; };
 
     data.forEach(row => {
+      // 1. Filter Dept
       var rowDept = (idxDept > -1) ? String(row[idxDept]).trim() : "";
-      if (deptFilter === "" || rowDept === deptFilter) {
+      var passDept = (deptFilter === "" || deptFilter === null || rowDept === deptFilter);
+
+      // 2. Filter Budget Type
+      var typeVal = (idxType > -1) ? String(row[idxType] || "").trim() : "";
+      var isMoph = (typeVal.includes('งบประมาณ') || typeVal.includes('สป.สธ') || typeVal === 'PP' || typeVal === 'OP' || typeVal.includes('งบดำเนินงาน')); 
+      var passType = true;
+      if (typeFilter === 'MOPH') passType = isMoph;
+      else if (typeFilter === 'NONMOPH') passType = !isMoph;
+
+      // 3. Filter Timeline (Quarter & Month)
+      var timeline = monthIndices.map(idx => (idx > -1 && String(row[idx]).trim() !== '') ? 1 : 0);
+      var passTime = true;
+      
+      if (quarterFilter && quarters[quarterFilter]) {
+          // Check if ANY month in the quarter is active
+          var activeInQ = quarters[quarterFilter].some(mIdx => timeline[mIdx] === 1);
+          if (!activeInQ) passTime = false;
+      }
+      
+      if (monthFilter) {
+          var mIdx = parseInt(monthFilter);
+          if (timeline[mIdx] !== 1) passTime = false;
+      }
+
+      if (passDept && passType && passTime) {
         var actName = (idxActivity > -1) ? row[idxActivity] : "";
         if (idxSub > -1 && row[idxSub]) { actName += " (" + row[idxSub] + ")"; }
         
         var approved = (idxApproved > -1) ? parseNum(row[idxApproved]) : 0;
         var alloc = (idxAllocated > -1) ? parseNum(row[idxAllocated]) : 0;
         var spent = (idxSpent > -1) ? parseNum(row[idxSpent]) : 0;
-        var balance = alloc - spent; // Force Calc
+        var balance = alloc - spent;
         
         summary.projects++; summary.approved += approved; summary.allocated += alloc; summary.spent += spent;
-        var timeline = monthIndices.map(idx => (idx > -1 && String(row[idx]).trim() !== '') ? 1 : 0);
         
         list.push({ 
             order: (idxOrder > -1) ? row[idxOrder] : "-", dept: rowDept, 
@@ -154,6 +242,8 @@ function getYearlyPlanData(deptFilter) {
     return { summary: summary, list: list };
   } catch (e) { return { error: e.message }; }
 }
+
+// ... (Functions อื่นๆ คงเดิม) ...
 
 // 4. SAVE TX
 function saveTransaction(form) {
