@@ -1,6 +1,6 @@
 var SPREADSHEET_ID = '1BhZDqEU7XKhgYgYnBrbFI7IMbr_SLdhU8rvhAMddodQ'; 
 var SHEET_NAME = 'm_actionplan';
-var APP_VERSION = '690130-1200'; 
+var APP_VERSION = '690130-1530'; 
 
 function doGet() {
   var template = HtmlService.createTemplateFromFile('index');
@@ -491,4 +491,101 @@ function searchHistory(sheetName, criteria, indices) {
     }
     return result.reverse(); 
   } catch(e) { return []; }
+}
+
+// ==========================================
+// 7. SUMMARY REPORT (NEW FEATURE)
+// ==========================================
+function getSummaryData(quarterFilter, monthFilter) {
+  try {
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet) return { error: "ไม่พบชีตข้อมูล" };
+    
+    var data = sheet.getDataRange().getValues();
+    var headers = data.shift();
+    var getIdx = (name) => headers.findIndex(h => String(h).trim() === name);
+    
+    // Indices
+    var idxDept = getIdx('กลุ่มงาน/งาน');
+    var idxType = getIdx('ประเภทงบ');
+    var idxAlloc = getIdx('จัดสรร');
+    var idxSpent = getIdx('เบิกจ่าย');
+    // Month Indices for Filtering
+    var monthIndices = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'].map(m => getIdx(m));
+    
+    var quarters = { 'Q1': [0, 1, 2], 'Q2': [3, 4, 5], 'Q3': [6, 7, 8], 'Q4': [9, 10, 11] };
+    var parseNum = (val) => { var v = parseFloat(String(val).replace(/,/g, '')); return isNaN(v) ? 0 : v; };
+
+    // Aggregation Containers
+    var grandTotal = { allocated: 0, spent: 0, count: 0 };
+    var bySource = {}; // Key: Source Name
+    var byDept = {};   // Key: Dept Name
+
+    data.forEach(row => {
+        // 1. Check Time Filter
+        var timeline = monthIndices.map(idx => (idx > -1 && String(row[idx]).trim() !== '') ? 1 : 0);
+        var passTime = true;
+        if (quarterFilter && quarters[quarterFilter]) {
+            var activeInQ = quarters[quarterFilter].some(mIdx => timeline[mIdx] === 1);
+            if (!activeInQ) passTime = false;
+        }
+        if (monthFilter) {
+            var mIdx = parseInt(monthFilter);
+            if (timeline[mIdx] !== 1) passTime = false;
+        }
+
+        if (passTime) {
+            // Data
+            var alloc = parseNum(row[idxAlloc]);
+            var spent = parseNum(row[idxSpent]);
+            var typeVal = String(row[idxType] || "ไม่ระบุ").trim();
+            var deptVal = String(row[idxDept] || "ไม่ระบุ").trim();
+            if(deptVal === "") deptVal = "ไม่ระบุ";
+
+            // Classify Source (Simple Logic)
+            var sourceGroup = "เงินนอกงบประมาณ (Non-MOPH)";
+            if (typeVal.includes('งบประมาณ') || typeVal.includes('สป.สธ') || typeVal === 'PP' || typeVal === 'OP' || typeVal.includes('งบดำเนินงาน')) {
+                sourceGroup = "งบประมาณ (สป.สธ.)";
+            }
+
+            // Aggregate Grand Total
+            grandTotal.allocated += alloc;
+            grandTotal.spent += spent;
+            grandTotal.count++;
+
+            // Aggregate by Source
+            if (!bySource[sourceGroup]) bySource[sourceGroup] = { allocated: 0, spent: 0, count: 0 };
+            bySource[sourceGroup].allocated += alloc;
+            bySource[sourceGroup].spent += spent;
+            bySource[sourceGroup].count++;
+
+            // Aggregate by Dept
+            if (!byDept[deptVal]) byDept[deptVal] = { allocated: 0, spent: 0, count: 0 };
+            byDept[deptVal].allocated += alloc;
+            byDept[deptVal].spent += spent;
+            byDept[deptVal].count++;
+        }
+    });
+
+    // Format for Chart.js
+    var deptList = [];
+    for (var k in byDept) {
+        deptList.push({ name: k, ...byDept[k] });
+    }
+    // Sort Dept by Allocated Amount (Desc)
+    deptList.sort((a, b) => b.allocated - a.allocated);
+
+    var sourceList = [];
+    for (var k in bySource) {
+        sourceList.push({ name: k, ...bySource[k] });
+    }
+
+    return {
+        grandTotal: grandTotal,
+        bySource: sourceList,
+        byDept: deptList
+    };
+
+  } catch (e) { return { error: e.message }; }
 }
