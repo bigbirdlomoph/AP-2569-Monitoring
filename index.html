@@ -77,6 +77,108 @@
         <div class="mb-4"><h3 class="fw-bold text-dark"><i class="fas fa-search me-2 text-secondary"></i>ระบบสืบค้นแผนปฏิบัติ</h3></div>
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-body bg-light rounded-3">
+              <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small">กลุ่มงาน</label>
+                    <select class="form-select select2" id="searchDeptSelect" style="width: 100%;"></select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small">ประเภทงบ</label>
+                    <select class="form-select" id="searchType">
+                        <option value="">-- ทั้งหมด --</option>
+                        <option value="MOPH">สป.สธ.</option>
+                        <option value="NONMOPH">เงินนอก สป.</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small">ไตรมาส</label>
+                    <select class="form-select" id="searchQuarter">
+                        <option value="">-- ทั้งหมด --</option>
+                        <option value="Q1">ไตรมาส 1 (ต.ค.-ธ.ค.)</option>
+                        <option value="Q2">ไตรมาส 2 (ม.ค.-มี.ค.)</option>
+                        <option value="Q3">ไตรมาส 3 (เม.ย.-มิ.ย.)</option>
+                        <option value="Q4">ไตรมาส 4 (ก.ค.-ก.ย.)</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small">เดือน</label>
+                    <select class="form-select" id="searchMonth">
+                        <option value="">-- ทั้งหมด --</option>
+                        <option value="0">ตุลาคม</option><option value="1">พฤศจิกายน</option><option value="2">ธันวาคม</option>
+                        <option value="3">มกราคม</option><option value="4">กุมภาพันธ์</option><option value="5">มีนาคม</option>
+                        <option value="6">เมษายน</option><option value="7">พฤษภาคม</option><option value="8">มิถุนายน</option>
+                        <option value="9">กรกฎาคม</option><option value="10">สิงหาคม</option><option value="11">กันยายน</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-success w-100" onclick="runSearch()"><i class="fas fa-search"></i></button>
+                        <button class="btn btn-secondary w-100" onclick="resetSearch()"><i class="fas fa-refresh"></i></button>
+                    </div>
+                </div>
+              </div>
+            </div>
+        </div>
+        <div class="row g-3 mb-4"><div class="col-md-4"><div class="card-metric bg-white border border-2 border-info h-100" style="min-height: 100px;"><div class="d-flex justify-content-between align-items-center"><div><div class="card-label text-info">จำนวนโครงการ</div><div class="card-value text-info" id="sum-count">0</div><div class="small text-muted">โครงการ</div></div><i class="fas fa-layer-group fa-3x text-info opacity-25"></i></div></div></div><div class="col-md-4"><div class="card-metric bg-white border border-2 border-primary h-100" style="min-height: 100px;"><div class="d-flex justify-content-between align-items-center"><div><div class="card-label text-primary">รวมขออนุมัติ</div><div class="card-value text-primary" id="sum-approved">0.00</div><div class="small text-muted">บาท</div></div><i class="fas fa-file-invoice-dollar fa-3x text-primary opacity-25"></i></div></div></div><div class="col-md-4"><div class="card-metric bg-white border border-2 border-success h-100" style="min-height: 100px;"><div class="d-flex justify-content-between align-items-center"><div><div class="card-label text-success">รวมจัดสรร</div><div class="card-value text-success" id="sum-allocated">0.00</div><div class="small text-muted">บาท</div></div><i class="fas fa-coins fa-3x text-success opacity-25"></i></div></div></div></div>
+        
+        <div class="card border-0 shadow-sm"><div class="card-body"><div class="table-responsive"><table id="searchTable" class="table table-hover w-100"><thead class="table-light"><tr><th class="ps-3">ลำดับ</th><th>กลุ่มงาน</th><th>รายการ/กิจกรรม</th><th>ประเภทงบ</th><th>แหล่งงบ</th><th class="text-center">ระยะเวลา</th><th class="text-end">อนุมัติ</th><th class="text-end">จัดสรร</th></tr></thead><tbody id="searchTableBody"></tbody></table></div></div></div>
+    </div>
+
+    <div id="yearly-page" class="page-section d-none fade-in">
+       <div class="mb-4"><h3 class="fw-bold text-dark"><i class="fas fa-calendar-alt me-2 text-secondary"></i>แผนงานประจำปี</h3></div>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body bg-light rounded-3 py-3">
+              <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small">กลุ่มงาน</label>
+                    <select class="form-select select2" id="yearlyDeptSelect" style="width: 100%;"></select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small">ประเภทงบ</label>
+                    <select class="form-select" id="yearlyType">
+                        <option value="">-- ทั้งหมด --</option>
+                        <option value="MOPH">สป.สธ.</option>
+                        <option value="NONMOPH">เงินนอก สป.</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small">ไตรมาส</label>
+                    <select class="form-select" id="yearlyQuarter">
+                        <option value="">-- ทั้งหมด --</option>
+                        <option value="Q1">ไตรมาส 1</option>
+                        <option value="Q2">ไตรมาส 2</option>
+                        <option value="Q3">ไตรมาส 3</option>
+                        <option value="Q4">ไตรมาส 4</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small">เดือน</label>
+                    <select class="form-select" id="yearlyMonth">
+                        <option value="">-- ทั้งหมด --</option>
+                        <option value="0">ตุลาคม</option><option value="1">พฤศจิกายน</option><option value="2">ธันวาคม</option>
+                        <option value="3">มกราคม</option><option value="4">กุมภาพันธ์</option><option value="5">มีนาคม</option>
+                        <option value="6">เมษายน</option><option value="7">พฤษภาคม</option><option value="8">มิถุนายน</option>
+                        <option value="9">กรกฎาคม</option><option value="10">สิงหาคม</option><option value="11">กันยายน</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-success w-100" onclick="loadYearlyData()"><i class="fas fa-search"></i></button>
+                        <button class="btn btn-secondary w-100" onclick="resetYearly()"><i class="fas fa-refresh"></i></button>
+                    </div>
+                </div>
+              </div>
+            </div>
+        </div>
+        <div class="row g-3 mb-4"><div class="col-md-4"><div class="card-metric bg-white border border-2 border-info h-100" style="min-height: 100px;"><div class="d-flex justify-content-between align-items-center"><div><div class="card-label text-info">จำนวนโครงการ</div><div class="card-value text-info" id="yp-count">0</div><div class="small text-muted">โครงการ</div></div><i class="fas fa-layer-group fa-3x text-info opacity-25"></i></div></div></div><div class="col-md-4"><div class="card-metric bg-white border border-2 border-primary h-100" style="min-height: 100px;"><div class="d-flex justify-content-between align-items-center"><div><div class="card-label text-primary">รวมขออนุมัติ</div><div class="card-value text-primary" id="yp-approved">0.00</div><div class="small text-muted">บาท</div></div><i class="fas fa-file-invoice-dollar fa-3x text-primary opacity-25"></i></div></div></div><div class="col-md-4"><div class="card-metric bg-white border border-2 border-success h-100" style="min-height: 100px;"><div class="d-flex justify-content-between align-items-center"><div><div class="card-label text-success">รวมจัดสรร</div><div class="card-value text-success" id="yp-allocated">0.00</div><div class="small text-muted">บาท</div></div><i class="fas fa-coins fa-3x text-success opacity-25"></i></div></div></div></div>
+        
+        <div class="card border-0 shadow-sm"><div class="card-body p-0"><div class="table-responsive"><table id="yearlyTable" class="table table-hover align-middle mb-0 w-100"><thead class="bg-light"><tr><th class="ps-3">ลำดับ</th><th>กลุ่มงาน</th><th>โครงการ/กิจกรรม</th><th>ประเภทงบ</th><th>แหล่งงบ</th><th class="text-center">ระยะเวลา</th><th class="text-end">จัดสรร</th><th class="text-end">เบิกจ่าย</th><th class="text-end pe-3">คงเหลือ</th></tr></thead><tbody id="yearlyTableBody"></tbody></table></div></div></div>
+    </div>
+
+    <!-- <div id="search-page" class="page-section d-none fade-in">
+        <div class="mb-4"><h3 class="fw-bold text-dark"><i class="fas fa-search me-2 text-secondary"></i>ระบบสืบค้นแผนปฏิบัติ</h3></div>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body bg-light rounded-3">
               <div class="row align-items-end">
                 <div class="col-md-6 mb-3 mb-md-0"><label class="form-label fw-bold">เลือกกลุ่มงาน/งาน</label><select class="form-select select2" id="searchDeptSelect" style="width: 100%;"></select></div>
                 <div class="col-md-3 mb-2 mb-md-0"><button class="btn btn-success w-100" onclick="runSearch()">ค้นหา</button></div>
@@ -101,7 +203,7 @@
         </div>
         <div class="row g-3 mb-4"><div class="col-md-4"><div class="card-metric bg-white border border-2 border-info h-100" style="min-height: 100px;"><div class="d-flex justify-content-between align-items-center"><div><div class="card-label text-info">จำนวนโครงการ</div><div class="card-value text-info" id="yp-count">0</div><div class="small text-muted">โครงการ</div></div><i class="fas fa-layer-group fa-3x text-info opacity-25"></i></div></div></div><div class="col-md-4"><div class="card-metric bg-white border border-2 border-primary h-100" style="min-height: 100px;"><div class="d-flex justify-content-between align-items-center"><div><div class="card-label text-primary">รวมขออนุมัติ</div><div class="card-value text-primary" id="yp-approved">0.00</div><div class="small text-muted">บาท</div></div><i class="fas fa-file-invoice-dollar fa-3x text-primary opacity-25"></i></div></div></div><div class="col-md-4"><div class="card-metric bg-white border border-2 border-success h-100" style="min-height: 100px;"><div class="d-flex justify-content-between align-items-center"><div><div class="card-label text-success">รวมจัดสรร</div><div class="card-value text-success" id="yp-allocated">0.00</div><div class="small text-muted">บาท</div></div><i class="fas fa-coins fa-3x text-success opacity-25"></i></div></div></div></div>
         <div class="card border-0 shadow-sm"><div class="card-body p-0"><div class="table-responsive"><table id="yearlyTable" class="table table-hover align-middle mb-0 w-100"><thead class="bg-light"><tr><th class="ps-3">ลำดับ</th><th>กลุ่มงาน</th><th>โครงการ/กิจกรรม</th><th>ประเภทงบ</th><th>แหล่งงบ</th><th class="text-center">ระยะเวลา</th><th class="text-end">จัดสรร</th><th class="text-end">เบิกจ่าย</th><th class="text-end pe-3">คงเหลือ</th></tr></thead><tbody id="yearlyTableBody"></tbody></table></div></div></div>
-    </div>
+    </div> -->
 
     <div id="transaction-page" class="page-section d-none fade-in">
       <div class="mb-4"><h3 class="fw-bold text-dark"><i class="fas fa-file-invoice-dollar me-2 text-secondary"></i>บันทึกรายการเบิกจ่าย</h3></div>
