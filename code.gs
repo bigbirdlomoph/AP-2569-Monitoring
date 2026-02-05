@@ -1,6 +1,6 @@
 var SPREADSHEET_ID = '1BhZDqEU7XKhgYgYnBrbFI7IMbr_SLdhU8rvhAMddodQ'; 
 var SHEET_NAME = 'm_actionplan';
-var APP_VERSION = '690130-1600'; 
+var APP_VERSION = '6900205-1600'; 
 
 function doGet() {
   var template = HtmlService.createTemplateFromFile('index');
@@ -494,10 +494,8 @@ function searchHistory(sheetName, criteria, indices) {
 }
 
 // ==========================================
-// 7. SUMMARY REPORT (NEW FEATURE)
+// 7. SUMMARY REPORT (CLEAN & FIXED)
 // ==========================================
-// ... (ฟังก์ชัน getSummaryData เดิม) ...
-
 function getSummaryData(quarterFilter, monthFilter) {
   try {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -508,7 +506,6 @@ function getSummaryData(quarterFilter, monthFilter) {
     var headers = data.shift();
     var getIdx = (name) => headers.findIndex(h => String(h).trim() === name);
     
-    // Indices
     var idxDept = getIdx('กลุ่มงาน/งาน');
     var idxType = getIdx('ประเภทงบ');
     var idxAlloc = getIdx('จัดสรร');
@@ -520,60 +517,40 @@ function getSummaryData(quarterFilter, monthFilter) {
 
     var grandTotal = { allocated: 0, spent: 0, count: 0 };
     var bySource = {}; 
-    
-    // 3 Buckets for Departments
-    var byDeptAll = {};
-    var byDeptMoph = {};
-    var byDeptNon = {};
+    var byDeptAll = {}, byDeptMoph = {}, byDeptNon = {};
 
     data.forEach(row => {
-        // ... (Time Filter Logic เหมือนเดิม) ...
         var timeline = monthIndices.map(idx => (idx > -1 && String(row[idx]).trim() !== '') ? 1 : 0);
         var passTime = true;
-        if (quarterFilter && quarters[quarterFilter]) {
-            if (!quarters[quarterFilter].some(mIdx => timeline[mIdx] === 1)) passTime = false;
-        }
-        if (monthFilter) {
-            if (timeline[parseInt(monthFilter)] !== 1) passTime = false;
-        }
+        if (quarterFilter && quarters[quarterFilter]) { if (!quarters[quarterFilter].some(mIdx => timeline[mIdx] === 1)) passTime = false; }
+        if (monthFilter) { if (timeline[parseInt(monthFilter)] !== 1) passTime = false; }
 
         if (passTime) {
             var alloc = parseNum(row[idxAlloc]);
             var spent = parseNum(row[idxSpent]);
             var typeVal = String(row[idxType] || "ไม่ระบุ").trim();
-            var deptVal = String(row[idxDept] || "ไม่ระบุ").trim();
-            if(deptVal === "") deptVal = "ไม่ระบุ";
-
-            // Check Budget Type
+            var deptVal = String(row[idxDept] || "ไม่ระบุ").trim(); if(deptVal === "") deptVal = "ไม่ระบุ";
             var isMoph = (typeVal.includes('งบประมาณ') || typeVal.includes('สป.สธ') || typeVal === 'PP' || typeVal === 'OP' || typeVal.includes('งบดำเนินงาน'));
             var sourceGroup = isMoph ? "งบประมาณ (สป.สธ.)" : "เงินนอกงบประมาณ (Non-MOPH)";
 
-            // 1. Grand Total
             grandTotal.allocated += alloc; grandTotal.spent += spent; grandTotal.count++;
 
-            // 2. By Source
             if (!bySource[sourceGroup]) bySource[sourceGroup] = { allocated: 0, spent: 0, count: 0 };
             bySource[sourceGroup].allocated += alloc; bySource[sourceGroup].spent += spent; bySource[sourceGroup].count++;
 
-            // 3. By Dept (ALL)
             if (!byDeptAll[deptVal]) byDeptAll[deptVal] = { allocated: 0, spent: 0, count: 0 };
             byDeptAll[deptVal].allocated += alloc; byDeptAll[deptVal].spent += spent; byDeptAll[deptVal].count++;
 
-            // 4. By Dept (MOPH)
             if (isMoph) {
                 if (!byDeptMoph[deptVal]) byDeptMoph[deptVal] = { allocated: 0, spent: 0, count: 0 };
                 byDeptMoph[deptVal].allocated += alloc; byDeptMoph[deptVal].spent += spent; byDeptMoph[deptVal].count++;
-            }
-
-            // 5. By Dept (Non-MOPH)
-            else {
+            } else {
                 if (!byDeptNon[deptVal]) byDeptNon[deptVal] = { allocated: 0, spent: 0, count: 0 };
                 byDeptNon[deptVal].allocated += alloc; byDeptNon[deptVal].spent += spent; byDeptNon[deptVal].count++;
             }
         }
     });
 
-    // Helper to format list
     var toList = (obj) => {
         var list = [];
         for (var k in obj) list.push({ name: k, ...obj[k] });
@@ -583,9 +560,83 @@ function getSummaryData(quarterFilter, monthFilter) {
     return {
         grandTotal: grandTotal,
         bySource: toList(bySource),
-        byDeptAll: toList(byDeptAll),   // ส่งกลับ 3 รายการ
+        byDeptAll: toList(byDeptAll),
         byDeptMoph: toList(byDeptMoph),
         byDeptNon: toList(byDeptNon)
+    };
+  } catch (e) { return { error: e.message }; }
+}
+
+// ==========================================
+// 8. DRILL-DOWN DETAILS (UPGRADED: Sums by Type)
+// ==========================================
+function getDeptDetails(deptName, quarterFilter, monthFilter) {
+  try {
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(SHEET_NAME);
+    var data = sheet.getDataRange().getValues();
+    var headers = data.shift();
+    
+    var getIdx = (name) => headers.findIndex(h => String(h).trim() === name);
+    var idxDept = getIdx('กลุ่มงาน/งาน');
+    var idxProj = getIdx('โครงการ'); if (idxProj === -1) idxProj = getIdx('โครงการ/กิจกรรม');
+    var idxAct = getIdx('กิจกรรมหลัก');
+    var idxAlloc = getIdx('จัดสรร');
+    var idxSpent = getIdx('เบิกจ่าย');
+    var idxType = getIdx('ประเภทงบ');
+    
+    var monthIndices = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'].map(m => getIdx(m));
+    var quarters = { 'Q1': [0, 1, 2], 'Q2': [3, 4, 5], 'Q3': [6, 7, 8], 'Q4': [9, 10, 11] };
+    var parseNum = (val) => { var v = parseFloat(String(val).replace(/,/g, '')); return isNaN(v) ? 0 : v; };
+
+    // เตรียมตะกร้า 3 ใบ และเตรียม Summary 3 ชุด (เพื่อส่งไปแสดงบน Card แยกกัน)
+    var projectsAll = [], projectsMoph = [], projectsNon = [];
+    var sumAll = { allocated: 0, spent: 0 }, sumMoph = { allocated: 0, spent: 0 }, sumNon = { allocated: 0, spent: 0 };
+
+    data.forEach(row => {
+        var rowDept = String(row[idxDept] || "").trim();
+        if (rowDept !== deptName) return; 
+
+        var timeline = monthIndices.map(idx => (idx > -1 && String(row[idx]).trim() !== '') ? 1 : 0);
+        var passTime = true;
+        if (quarterFilter && quarters[quarterFilter]) { if (!quarters[quarterFilter].some(mIdx => timeline[mIdx] === 1)) passTime = false; }
+        if (monthFilter) { if (timeline[parseInt(monthFilter)] !== 1) passTime = false; }
+
+        if (passTime) {
+            var alloc = parseNum(row[idxAlloc]);
+            var spent = parseNum(row[idxSpent]);
+            var typeVal = String(row[idxType] || "").trim();
+            
+            var projObj = {
+                project: row[idxProj], activity: row[idxAct],
+                allocated: alloc, spent: spent, balance: alloc - spent,
+                progress: (alloc > 0) ? (spent / alloc * 100) : 0
+            };
+
+            // 1. ALL
+            projectsAll.push(projObj);
+            sumAll.allocated += alloc; sumAll.spent += spent;
+
+            // 2. CHECK TYPE
+            var isMoph = (typeVal.includes('งบประมาณ') || typeVal.includes('สป.สธ') || typeVal === 'PP' || typeVal === 'OP' || typeVal.includes('งบดำเนินงาน'));
+            
+            if (isMoph) {
+                projectsMoph.push(projObj);
+                sumMoph.allocated += alloc; sumMoph.spent += spent;
+            } else {
+                projectsNon.push(projObj);
+                sumNon.allocated += alloc; sumNon.spent += spent;
+            }
+        }
+    });
+
+    var sortFn = (a, b) => b.progress - a.progress;
+    projectsAll.sort(sortFn); projectsMoph.sort(sortFn); projectsNon.sort(sortFn);
+
+    return { 
+        projectsAll: projectsAll, projectsMoph: projectsMoph, projectsNon: projectsNon,
+        sumAll: sumAll, sumMoph: sumMoph, sumNon: sumNon, // ส่งค่า Summary แยก 3 ชุดกลับไป
+        deptName: deptName 
     };
 
   } catch (e) { return { error: e.message }; }
