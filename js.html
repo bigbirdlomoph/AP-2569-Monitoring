@@ -116,20 +116,18 @@
       $('#s-total-alloc').text(fmt(data.grandTotal.allocated));
       $('#s-total-spent').text(fmt(data.grandTotal.spent));
       $('#s-total-bal').text(fmt(data.grandTotal.allocated - data.grandTotal.spent));
-      
       var pct = (data.grandTotal.allocated > 0) ? (data.grandTotal.spent / data.grandTotal.allocated * 100) : 0;
       $('#s-total-pct').text(pct.toFixed(2) + '%');
 
-      // 2. Render Charts (Pie & Bar)
-      renderSummaryCharts(data);
+      // 2. Render Charts (กราฟยังคงใช้ข้อมูลเดิมที่เรียงตามยอดงบประมาณ เพื่อแสดง Top 5 Budget)
+      renderSummaryCharts(data); 
 
-      // 3. Render Table 1: Budget Source
+      // 3. Render Table 1: Source (ตารางแยกแหล่งเงิน)
       var tSource = $('#tableSourceBody').empty();
       data.bySource.forEach(s => {
           var bal = s.allocated - s.spent;
           var p = (s.allocated > 0) ? (s.spent / s.allocated * 100) : 0;
           var badgeColor = (p >= 80) ? 'bg-success' : (p >= 50 ? 'bg-warning text-dark' : 'bg-danger');
-          
           tSource.append(`<tr>
               <td class="ps-4 fw-bold">${s.name}</td>
               <td class="text-center">${s.count}</td>
@@ -140,13 +138,59 @@
           </tr>`);
       });
 
-      // 4. Render Table 2: Department Performance (3 Tabs)
-      renderDeptTable(data.byDeptAll, '#tableDeptAllBody');
-      renderDeptTable(data.byDeptMoph, '#tableDeptMophBody');
-      renderDeptTable(data.byDeptNon, '#tableDeptNonBody');
+      // 4. Render Table 2 (3 Tabs) - [แก้ไข: เรียงลำดับตามความก้าวหน้าจาก มาก -> น้อย]
+      // ฟังก์ชันช่วยเรียงลำดับ (ใช้ slice() เพื่อไม่ให้กระทบข้อมูลต้นฉบับของกราฟ)
+      var sortProg = (arr) => arr.slice().sort((a, b) => {
+          var pA = (a.allocated > 0) ? (a.spent / a.allocated) : 0;
+          var pB = (b.allocated > 0) ? (b.spent / b.allocated) : 0;
+          return pB - pA; // เรียง Percent มาก ขึ้นก่อน
+      });
+
+      renderDeptTable(sortProg(data.byDeptAll), '#tableDeptAllBody');
+      renderDeptTable(sortProg(data.byDeptMoph), '#tableDeptMophBody');
+      renderDeptTable(sortProg(data.byDeptNon), '#tableDeptNonBody');
   }
 
-  // Helper: Render Department Table Rows
+  // function renderSummaryPage(data) {
+  //     if(data.error) { Swal.fire('Error', data.error, 'error'); return; }
+      
+  //     var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
+      
+  //     // 1. Update Scorecards
+  //     $('#s-total-alloc').text(fmt(data.grandTotal.allocated));
+  //     $('#s-total-spent').text(fmt(data.grandTotal.spent));
+  //     $('#s-total-bal').text(fmt(data.grandTotal.allocated - data.grandTotal.spent));
+      
+  //     var pct = (data.grandTotal.allocated > 0) ? (data.grandTotal.spent / data.grandTotal.allocated * 100) : 0;
+  //     $('#s-total-pct').text(pct.toFixed(2) + '%');
+
+  //     // 2. Render Charts (Pie & Bar)
+  //     renderSummaryCharts(data);
+
+  //     // 3. Render Table 1: Budget Source
+  //     var tSource = $('#tableSourceBody').empty();
+  //     data.bySource.forEach(s => {
+  //         var bal = s.allocated - s.spent;
+  //         var p = (s.allocated > 0) ? (s.spent / s.allocated * 100) : 0;
+  //         var badgeColor = (p >= 80) ? 'bg-success' : (p >= 50 ? 'bg-warning text-dark' : 'bg-danger');
+          
+  //         tSource.append(`<tr>
+  //             <td class="ps-4 fw-bold">${s.name}</td>
+  //             <td class="text-center">${s.count}</td>
+  //             <td class="text-end text-primary">${fmt(s.allocated)}</td>
+  //             <td class="text-end text-danger">${fmt(s.spent)}</td>
+  //             <td class="text-center"><span class="badge ${badgeColor}">${p.toFixed(2)}%</span></td>
+  //             <td class="text-end pe-4 fw-bold">${fmt(bal)}</td>
+  //         </tr>`);
+  //     });
+
+  //     // 4. Render Table 2: Department Performance (3 Tabs)
+  //     renderDeptTable(data.byDeptAll, '#tableDeptAllBody');
+  //     renderDeptTable(data.byDeptMoph, '#tableDeptMophBody');
+  //     renderDeptTable(data.byDeptNon, '#tableDeptNonBody');
+  // }
+
+  // Helper: Render Dept Table with Clickable Rows
   function renderDeptTable(deptList, tbodyId) {
       var tbody = $(tbodyId).empty();
       if (!deptList || deptList.length === 0) {
@@ -160,8 +204,9 @@
           var p = (d.allocated > 0) ? (d.spent / d.allocated * 100) : 0;
           var colorClass = (p >= 80) ? 'bg-success' : (p >= 50 ? 'bg-warning' : 'bg-danger');
           
-          tbody.append(`<tr>
-              <td class="ps-4 text-nowrap">${d.name}</td>
+          // เพิ่ม style="cursor: pointer;" และ onclick="openDrillDown(...)"
+          tbody.append(`<tr style="cursor: pointer;" onclick="openDrillDown('${d.name}')" title="คลิกเพื่อดูรายละเอียดโครงการ">
+              <td class="ps-4 text-nowrap fw-bold text-primary"><i class="fas fa-search me-2 small opacity-50"></i>${d.name}</td>
               <td class="text-center">${d.count}</td>
               <td class="text-end">${fmt(d.allocated)}</td>
               <td class="text-end">${fmt(d.spent)}</td>
@@ -174,6 +219,35 @@
           </tr>`);
       });
   }
+
+  // Helper: Render Department Table Rows
+  // function renderDeptTable(deptList, tbodyId) {
+  //     var tbody = $(tbodyId).empty();
+  //     if (!deptList || deptList.length === 0) {
+  //         tbody.append('<tr><td colspan="6" class="text-center py-3 text-muted">ไม่มีข้อมูล</td></tr>');
+  //         return;
+  //     }
+  //     var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
+      
+  //     deptList.forEach(d => {
+  //         var bal = d.allocated - d.spent;
+  //         var p = (d.allocated > 0) ? (d.spent / d.allocated * 100) : 0;
+  //         var colorClass = (p >= 80) ? 'bg-success' : (p >= 50 ? 'bg-warning' : 'bg-danger');
+          
+  //         tbody.append(`<tr>
+  //             <td class="ps-4 text-nowrap">${d.name}</td>
+  //             <td class="text-center">${d.count}</td>
+  //             <td class="text-end">${fmt(d.allocated)}</td>
+  //             <td class="text-end">${fmt(d.spent)}</td>
+  //             <td class="align-middle px-3">
+  //                 <div class="progress" style="height: 20px;">
+  //                     <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${p}%">${p.toFixed(1)}%</div>
+  //                 </div>
+  //             </td>
+  //             <td class="text-end pe-4 fw-bold ${bal < 0 ? 'text-danger' : 'text-success'}">${fmt(bal)}</td>
+  //         </tr>`);
+  //     });
+  // }
 
   function renderSummaryCharts(data) {
       // 1. Pie Chart (Source)
@@ -426,4 +500,109 @@
 
   // Helper
   function getTimelineDisplayHtml(timeline) { var months = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.']; var activeCount = timeline.filter(x => x).length; if (activeCount === 0) return '-'; if (activeCount === 12) return '<span class="badge bg-success rounded-pill fw-normal">ทั้งปีงบประมาณ</span>'; var html = '<div class="d-flex flex-wrap gap-1 justify-content-center flex-column align-items-start">'; var quarters = [ { name: 'ไตรมาส 1', indices: [0, 1, 2] }, { name: 'ไตรมาส 2', indices: [3, 4, 5] }, { name: 'ไตรมาส 3', indices: [6, 7, 8] }, { name: 'ไตรมาส 4', indices: [9, 10, 11] } ]; quarters.forEach(function(q) { var activeInQ = q.indices.filter(idx => timeline[idx]); if (activeInQ.length === 3) { html += `<span class="badge bg-primary rounded-pill fw-normal mb-1">${q.name}</span>`; } else if (activeInQ.length > 0) { var monthBadges = activeInQ.map(idx => `<span class="badge bg-success fw-normal">${months[idx]}</span>`).join(' '); html += `<div class="mb-1"><strong class="text-secondary small me-1">${q.name} :</strong>${monthBadges}</div>`; } }); html += '</div>'; return html; }
+
+  // ตัวแปร Global สำหรับเก็บข้อมูล DrillDown ปัจจุบัน
+  var CURRENT_DD_DATA = null;
+
+  // --- DRILL-DOWN LOGIC ---
+  function openDrillDown(deptName) {
+      // 1. [สำคัญ] ล้างค่าข้อมูลเก่าทิ้งทันที เพื่อกันค่าค้าง
+      CURRENT_DD_DATA = null; 
+
+      // 2. รีเซ็ตข้อความบนหัวเรื่อง และ Card ให้หมุนรอ (Loading)
+      $('#ddTitle').text(deptName);
+      $('#ddAlloc').html('<i class="fas fa-spinner fa-spin text-secondary"></i>');
+      $('#ddSpent').html('<i class="fas fa-spinner fa-spin text-secondary"></i>');
+      $('#ddProgress').html('<i class="fas fa-spinner fa-spin text-secondary"></i>');
+      
+      // 3. รีเซ็ตตารางให้หมุนรอ
+      var loadingHtml = '<tr><td colspan="5" class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-success"></i><div class="mt-2 text-muted">กำลังดึงข้อมูลโครงการ...</div></td></tr>';
+      $('#ddTableBodyAll, #ddTableBodyMoph, #ddTableBodyNon').html(loadingHtml);
+      
+      // 4. บังคับดีดกลับมาที่ Tab แรก (ทั้งหมด) เสมอ
+      var triggerEl = document.querySelector('#deptDrillDownModal button[data-bs-target="#tab-dd-all"]');
+      if (triggerEl) {
+          var tabInstance = bootstrap.Tab.getInstance(triggerEl);
+          if (tabInstance) tabInstance.show();
+          else new bootstrap.Tab(triggerEl).show();
+      }
+
+      // 5. เปิด Modal
+      new bootstrap.Modal(document.getElementById('deptDrillDownModal')).show();
+
+      // 6. ดึงข้อมูลใหม่
+      var q = $('#sumQuarter').val();
+      var m = $('#sumMonth').val();
+      google.script.run.withSuccessHandler(renderDrillDownData).getDeptDetails(deptName, q, m);
+  }
+
+  function renderDrillDownData(data) {
+      if(data.error) { $('#ddTableBodyAll').html(`<tr><td colspan="5" class="text-center text-danger">${data.error}</td></tr>`); return; }
+
+      // 1. เก็บข้อมูลลงตัวแปร Global เพื่อใช้ตอนสลับแท็บ
+      CURRENT_DD_DATA = data;
+
+      // 2. Render ตารางทั้ง 3 แท็บรอไว้เลย
+      renderProjectTable(data.projectsAll, '#ddTableBodyAll');
+      renderProjectTable(data.projectsMoph, '#ddTableBodyMoph');
+      renderProjectTable(data.projectsNon, '#ddTableBodyNon');
+
+      // 3. อัปเดตการ์ดครั้งแรก (Default: All)
+      updateDrillDownCards('all');
+
+      // 4. ผูก Event Listener ให้ปุ่มแท็บ (ทำครั้งเดียวก็พอ แต่ทำซ้ำก็ไม่เสียหายมากในที่นี้)
+      $('button[data-bs-toggle="tab"]').off('shown.bs.tab').on('shown.bs.tab', function (e) {
+          var target = $(e.target).attr("data-bs-target"); // ได้ค่า #tab-dd-all, #tab-dd-moph, ...
+          if (target === '#tab-dd-all') updateDrillDownCards('all');
+          if (target === '#tab-dd-moph') updateDrillDownCards('moph');
+          if (target === '#tab-dd-non') updateDrillDownCards('non');
+      });
+  }
+
+  function updateDrillDownCards(type) {
+      if (!CURRENT_DD_DATA) return;
+      
+      var s = CURRENT_DD_DATA.sumAll; // Default
+      if (type === 'moph') s = CURRENT_DD_DATA.sumMoph;
+      if (type === 'non') s = CURRENT_DD_DATA.sumNon;
+
+      var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
+      
+      // Animation Effect เล็กน้อย
+      $('#ddAlloc, #ddSpent, #ddProgress').hide().fadeIn(200);
+
+      $('#ddAlloc').text(fmt(s.allocated));
+      $('#ddSpent').text(fmt(s.spent));
+      var pct = (s.allocated > 0) ? (s.spent / s.allocated * 100) : 0;
+      $('#ddProgress').text(pct.toFixed(2) + '%');
+  }
+
+  // (ฟังก์ชัน renderProjectTable เดิมที่ท่านมีอยู่ ใช้ได้เลยครับ หรือจะก๊อปไปวางทับเพื่อความชัวร์ก็ได้ครับ)
+  function renderProjectTable(projList, tbodyId) {
+      var tbody = $(tbodyId).empty();
+      if (!projList || projList.length === 0) {
+          tbody.append('<tr><td colspan="5" class="text-center py-4 text-muted">ไม่พบโครงการในหมวดนี้</td></tr>');
+          return;
+      }
+      var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
+      projList.forEach(p => {
+          var statusBadge = '';
+          if (p.progress >= 80) statusBadge = '<span class="badge bg-success">ดีเยี่ยม</span>';
+          else if (p.progress >= 50) statusBadge = '<span class="badge bg-warning text-dark">ปานกลาง</span>';
+          else if (p.progress > 0) statusBadge = '<span class="badge bg-danger">ล่าช้า</span>';
+          else statusBadge = '<span class="badge bg-secondary">ยังไม่เริ่ม</span>';
+          
+          var pName = (p.project && p.project !== "undefined") ? p.project : "<span class='text-danger'>ไม่ระบุชื่อโครงการ</span>";
+
+          tbody.append(`<tr>
+              <td class="ps-3"><div class="fw-bold text-dark text-wrap">${pName}</div><div class="small text-muted text-wrap">${p.activity || '-'}</div></td>
+              <td class="text-end">${fmt(p.allocated)}</td>
+              <td class="text-end text-danger">${fmt(p.spent)}</td>
+              <td class="text-center">${statusBadge} <small class="text-muted d-block mt-1">(${p.progress.toFixed(1)}%)</small></td>
+              <td class="text-end pe-3 fw-bold">${fmt(p.balance)}</td>
+          </tr>`);
+      });
+  }
+
+
 </script>
