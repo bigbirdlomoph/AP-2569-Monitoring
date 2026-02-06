@@ -10,6 +10,14 @@
        - ฟอร์มบันทึกยืมเงิน  </br>
        - ประวัติการยืมเงิน </br>
        - บันทึกการคืนเงินยืม </br>
+6 กุมภาพันธ์ 2569 </br>
+- Modal Drill Down</br>
+- ปรับหน้าบันทึกเบิกจ่าย</br>
+<img width="1905" height="1080" alt="2026-02-06_15-42-48" src="https://github.com/user-attachments/assets/b8c7f3ee-f757-4b2f-9f72-008ea498ceb3" />
+![2026-02-06_15-40-54](https://github.com/user-attachments/assets/2e083fd6-ca56-4040-bf7f-559dd52a8ee8)
+<img width="1901" height="1080" alt="2026-02-06_15-40-32" src="https://github.com/user-attachments/assets/984e3c10-a7c6-49b2-b6fb-48d797189fc9" />
+<img width="1905" height="1080" alt="2026-02-06_15-40-23" src="https://github.com/user-attachments/assets/a868ae85-b939-4e38-9e7d-e0621f0cbf00" />
+<img width="1905" height="1080" alt="2026-02-06_15-32-35" src="https://github.com/user-attachments/assets/bd2b24fe-a3b9-4234-ac70-45da757a3984" />
 
 Dashboard
 ![2026-01-30_16-05-49](https://github.com/user-attachments/assets/cb11a827-2edb-467b-ba4d-1f88980ae43b)
