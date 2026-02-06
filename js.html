@@ -1,60 +1,81 @@
 <script>
-  // Global Variables
+  // ==========================================
+  // 1. GLOBAL VARIABLES & NAVIGATION
+  // ==========================================
   var CACHED_OPTIONS = null;
-  var summaryPieChart = null; // เก็บ Instance กราฟวงกลม
-  var summaryBarChart = null; // เก็บ Instance กราฟแท่ง
+  var summaryPieChart = null; 
+  var summaryBarChart = null; 
+  var CURRENT_DD_DATA = null;
 
-  // --- NAVIGATION ---
   function switchPage(pageId, element) {
     $('.page-section').addClass('d-none');
     $('#' + pageId + '-page').removeClass('d-none');
     $('.nav-pill-btn').removeClass('active');
     if(element) $(element).addClass('active');
     
-    // Page Specific Inits
-    if (pageId === 'transaction') { document.getElementById('txDate').valueAsDate = new Date(); loadTxHistory(); }
+    // Trigger Page Logic
+    if (pageId === 'transaction') { loadTxHistory(); }
     if (pageId === 'loan') { document.getElementById('loanDate').valueAsDate = new Date(); loadLoanHistory(); }
-    if (pageId === 'yearly') initYearlyPage(); // Placeholder
+    if (pageId === 'yearly') initYearlyPage(); 
     if (pageId === 'summary') { loadSummary(); }
+    if (pageId === 'dashboard') { loadDashboardData(); }
   }
 
-  // --- INITIALIZATION ---
+  // ==========================================
+  // 2. INITIALIZATION (SAFETY FIRST METHOD)
+  // ==========================================
   $(document).ready(function() {
+    console.log("System Initializing..."); // Debug
+
+    // A. โหลดข้อมูลตั้งต้น
     refreshMasterData();
     loadDashboardData();
 
-    // 1. General Select2
-    $('.select2').not('#txSubActivity, #loanSubActivity').select2({ theme: 'bootstrap-5', allowClear: true });
-    
-    // Explicit Init for Search Filters
-    $('#txOrder, #loanOrder, #searchLoanOrder, #searchTxOrder').select2({ theme: 'bootstrap-5', placeholder: '-- เลือกลำดับ --', allowClear: true });
-    $('#searchLoanAct, #searchTxAct').select2({ theme: 'bootstrap-5', placeholder: '-- ทั้งหมด --', allowClear: true });
-    $('#searchLoanProj, #searchTxProj').select2({ theme: 'bootstrap-5', placeholder: '-- เลือกโครงการ --', allowClear: true });
-    $('#searchDeptSelect, #yearlyDeptSelect').select2({ theme: 'bootstrap-5', placeholder: '-- เลือกกลุ่มงาน --', allowClear: true });
-    $('#searchLoanSub, #searchTxSub').select2({ theme: 'bootstrap-5', placeholder: '-- เลือกกิจกรรมย่อย --', allowClear: true });
-
-    // 2. Special Select2 Template (Word Wrap)
-    var wrapTemplate = {
-      theme: 'bootstrap-5',
-      placeholder: '-- เลือกกิจกรรมย่อย --',
-      allowClear: true,
-      templateResult: function (data) {
-        if (!data.id) { return data.text; }
-        return $('<div style="white-space: normal; word-wrap: break-word; line-height: 1.5; padding: 5px 0;">' + data.text + '</div>');
-      },
-      templateSelection: function (data) {
-        if (!data.id) { return data.text; }
-        return $('<div style="white-space: normal; word-wrap: break-word; line-height: 1.5;">' + data.text + '</div>');
-      }
+    // B. SETUP SELECT2 : GROUP 1 (Transaction Modal)
+    // ------------------------------------------------
+    // ต้องระบุ dropdownParent ให้ Modal ทุกตัว
+    $('#txOrder').select2({ 
+        theme: 'bootstrap-5', placeholder: '-- เลือกลำดับ --', allowClear: true,
+        dropdownParent: $('#txModal') 
+    });
+    $('#txActivity').select2({ 
+        theme: 'bootstrap-5', placeholder: '-- เลือกกิจกรรม --', allowClear: true,
+        dropdownParent: $('#txModal') 
+    });
+    // Template พิเศษสำหรับ SubActivity ใน Modal
+    var wrapTemplateTx = {
+        theme: 'bootstrap-5', placeholder: '-- เลือกกิจกรรมย่อย --', allowClear: true,
+        dropdownParent: $('#txModal'),
+        templateResult: formatState, templateSelection: formatState
     };
-    $('#txSubActivity').select2(wrapTemplate);
-    $('#loanSubActivity').select2(wrapTemplate); 
+    $('#txSubActivity').select2(wrapTemplateTx);
 
-    // 3. Event Listeners
-    $('#txOrder').on('select2:select', function (e) { onTxOrderChange(); });
+    // C. SETUP SELECT2 : GROUP 2 (Loan Page - Normal)
+    // ------------------------------------------------
+    $('#loanOrder').select2({ theme: 'bootstrap-5', placeholder: '-- เลือกลำดับ --', allowClear: true });
+    $('#loanActivity').select2({ theme: 'bootstrap-5', placeholder: '-- เลือกกิจกรรม --', allowClear: true });
+    
+    var wrapTemplateNormal = {
+        theme: 'bootstrap-5', placeholder: '-- เลือกกิจกรรมย่อย --', allowClear: true,
+        templateResult: formatState, templateSelection: formatState
+    };
+    $('#loanSubActivity').select2(wrapTemplateNormal);
+
+    // D. SETUP SELECT2 : GROUP 3 (Search Filters)
+    // ------------------------------------------------
+    var searchIds = ['#searchLoanOrder', '#searchTxOrder', '#searchLoanAct', '#searchTxAct', '#searchLoanProj', '#searchTxProj', '#searchDeptSelect', '#yearlyDeptSelect', '#searchLoanSub', '#searchTxSub'];
+    searchIds.forEach(function(id) {
+        $(id).select2({ theme: 'bootstrap-5', placeholder: 'เลือกข้อมูล...', allowClear: true });
+    });
+
+    // E. EVENT LISTENERS
+    // ------------------------------------------------
+    // Transaction Events
+    $('#txOrder').on('change select2:select', function (e) { onTxOrderChange(); });
     $('#txOrder').on('select2:clear', function (e) { clearTxForm(); });
-    $('#txActivity').on('select2:select', function(e) { onTxActivityChange(); });
+    $('#txActivity').on('change select2:select', function(e) { onTxActivityChange(); });
 
+    // Loan Events
     $('#loanOrder').on('select2:select', function (e) { onLoanOrderChange(); });
     $('#loanOrder').on('select2:clear', function (e) { clearLoanForm(); });
     $('#loanActivity').off('select2:select').on('select2:select', function(e) { onLoanActivityChange(); });
@@ -63,18 +84,27 @@
     $('#searchLoanOrder').on('select2:select', function(e) { onCascadingChange('searchLoan', 'order'); });
     $('#searchLoanProj').on('select2:select', function(e) { onCascadingChange('searchLoan', 'proj'); });
     $('#searchLoanAct').on('select2:select', function(e) { onCascadingChange('searchLoan', 'act'); });
-
     $('#searchTxOrder').on('select2:select', function(e) { onCascadingChange('searchTx', 'order'); });
     $('#searchTxProj').on('select2:select', function(e) { onCascadingChange('searchTx', 'proj'); });
     $('#searchTxAct').on('select2:select', function(e) { onCascadingChange('searchTx', 'act'); });
 
-    // Back to Top Button
+    // Back to Top
     let mybutton = document.getElementById("btn-back-to-top");
-    window.onscroll = function () { if (document.body.scrollTop > 300 || document.documentElement.scrollTop > 300) { mybutton.style.display = "block"; } else { mybutton.style.display = "none"; } };
-    mybutton.addEventListener("click", function() { window.scrollTo({top: 0, behavior: 'smooth'}); });
+    if(mybutton){
+        window.onscroll = function () { if (document.body.scrollTop > 300 || document.documentElement.scrollTop > 300) { mybutton.style.display = "block"; } else { mybutton.style.display = "none"; } };
+        mybutton.addEventListener("click", function() { window.scrollTo({top: 0, behavior: 'smooth'}); });
+    }
   });
 
-  // --- DATA LOADING ---
+  // Helper for Select2 Template
+  function formatState (data) {
+      if (!data.id) { return data.text; }
+      return $('<div style="white-space: normal; word-wrap: break-word; line-height: 1.5; padding: 3px 0;">' + data.text + '</div>');
+  }
+
+  // ==========================================
+  // 3. MASTER DATA LOADER
+  // ==========================================
   function refreshMasterData() {
       google.script.run.withSuccessHandler(function(data) { 
           CACHED_OPTIONS = data || [];
@@ -85,10 +115,13 @@
   function populateInitDropdowns() {
       if (!CACHED_OPTIONS) return;
       var orders = [...new Set(CACHED_OPTIONS.map(r => r.order).filter(o => o != "" && o != null))].sort((a,b) => a - b);
+      
+      // Update ALL Order Dropdowns
       ['#txOrder', '#loanOrder', '#searchLoanOrder', '#searchTxOrder'].forEach(sel => {
           var $s = $(sel); $s.empty().append('<option value="">-- เลือกลำดับ --</option>');
           orders.forEach(o => $s.append(`<option value="${o}">${o}</option>`));
       });
+      
       var depts = [...new Set(CACHED_OPTIONS.map(r => r.dept).filter(Boolean))].sort();
       ['#searchDeptSelect', '#yearlyDeptSelect'].forEach(sel => {
           var $s = $(sel); $s.empty().append('<option value="">-- แสดงทั้งหมด --</option>');
@@ -96,107 +129,308 @@
       });
   }
 
-  // --- PAGE: SUMMARY REPORT ---
+  // ==========================================
+  // 4. DASHBOARD LOGIC
+  // ==========================================
+  function loadDashboardData() { 
+      // Reset loading state
+      $('#moph-approved').html('<i class="fas fa-spinner fa-spin"></i>');
+      google.script.run.withSuccessHandler(renderDashboard).getDashboardData(); 
+  }
+
+  function renderDashboard(data) { 
+      if(!data || data.error) { 
+          $('#moph-approved').html('<span class="text-danger small">' + (data ? data.error : "Error") + '</span>'); 
+          return; 
+      } 
+      updateCards('moph', data.moph); 
+      renderGauge('mophGauge', data.moph); 
+      renderBarChart('mophBar', data.moph.deptStats, '#198754'); 
+      updateCards('nonmoph', data.nonMoph); 
+      renderGauge('nonMophGauge', data.nonMoph); 
+      renderBarChart('nonMophBar', data.nonMoph.deptStats, '#0d6efd'); 
+  }
+
+  function updateCards(prefix, stats) { 
+      var fmt = (num) => Number(num).toLocaleString(undefined, {minimumFractionDigits: 2}); 
+      $('#' + prefix + '-approved').text(fmt(stats.approved)); 
+      $('#' + prefix + '-allocated').text(fmt(stats.allocated)); 
+      $('#' + prefix + '-spent').text(fmt(stats.spent)); 
+      $('#' + prefix + '-balance').text(fmt(stats.balance)); 
+  }
+
+  function renderGauge(canvasId, stats) { 
+      var alloc = stats.allocated || 0; var spent = stats.spent || 0; 
+      var percent = alloc > 0 ? (spent / alloc) * 100 : 0; 
+      $('#' + canvasId + 'Text').text(percent.toFixed(2) + '%'); 
+      
+      var ctx = document.getElementById(canvasId);
+      if(ctx) {
+          var chartStatus = Chart.getChart(canvasId); 
+          if (chartStatus != undefined) { chartStatus.destroy(); }
+          new Chart(ctx, { 
+              type: 'doughnut', 
+              data: { labels: ['เบิกจ่าย', 'คงเหลือ'], datasets: [{ data: [percent, 100 - percent], backgroundColor: ['#dc3545', '#e9ecef'], borderWidth: 0, hoverOffset: 0 }] }, 
+              options: { responsive: true, maintainAspectRatio: false, rotation: -90, circumference: 180, cutout: '80%', plugins: { legend: {display:false}, tooltip: {enabled:false} } } 
+          });
+      }
+  }
+
+  function renderBarChart(canvasId, deptStats, colorTheme) { 
+      var chartData = []; 
+      for (var dept in deptStats) { 
+          var alloc = deptStats[dept].allocated; var spent = deptStats[dept].spent; 
+          var pct = alloc > 0 ? (spent / alloc) * 100 : 0; 
+          if(alloc > 0) chartData.push({ label: dept, y: pct }); 
+      } 
+      chartData.sort((a, b) => b.y - a.y); 
+      
+      var ctx = document.getElementById(canvasId);
+      if(ctx) {
+          var chartStatus = Chart.getChart(canvasId); 
+          if (chartStatus != undefined) { chartStatus.destroy(); }
+          new Chart(ctx, { 
+              type: 'bar', 
+              data: { labels: chartData.map(d => d.label), datasets: [{ data: chartData.map(d => d.y), backgroundColor: colorTheme, borderRadius: 4, barPercentage: 0.6 }] }, 
+              options: { responsive: true, maintainAspectRatio: false, indexAxis: 'x', plugins: { legend: {display:false}, tooltip: { callbacks: { label: (c) => c.raw.toFixed(2) + '%' } } }, scales: { y: { beginAtZero: true, max: 100, ticks: { callback: (v) => v + "%" } }, x: { grid: {display:false} } } } 
+          }); 
+      }
+  }
+
+  // ==========================================
+  // 5. TRANSACTION LOGIC (MODERN MODAL)
+  // ==========================================
+
+  // 1. แก้ไขส่วนแสดงชื่อโครงการ (ใน onTxOrderChange)
+  function onTxOrderChange() { 
+      var order = $('#txOrder').val(); 
+      var select = $('#txActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>'); 
+      $('#divTxSubActivity').addClass('d-none'); 
+      $('#txSubActivity').empty(); 
+      $('#txInfoBox').addClass('d-none'); 
+      
+      if(!order) { 
+          select.trigger('change').prop('disabled', true); 
+          return; 
+      } 
+      
+      var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order)); 
+      if (rows.length > 0) { 
+          // [UPDATED] ปรับชื่อโครงการ: แสดงเต็ม + ตัวเล็กลง + ปัดบรรทัด
+          $('#tx_disp_proj')
+              .text(rows[0].project)
+              .removeClass('text-truncate') // เอาการตัดคำออก
+              .addClass('text-wrap')        // ให้ปัดบรรทัดอัตโนมัติ
+              .css('font-size', '0.9rem');  // ลดขนาดตัวอักษรลงนิดนึง
+
+          $('#tx_disp_dept').text(rows[0].dept); 
+          $('#txProjectInfo').removeClass('d-none');
+          
+          var activities = [...new Set(rows.map(r => r.activity))].sort(); 
+          activities.forEach(act => { select.append(`<option value="${act}">${act}</option>`); }); 
+          select.trigger('change').prop('disabled', false); 
+      } 
+  }
+
+  function onTxActivityChange() { 
+      var order = $('#txOrder').val(); 
+      var actName = $('#txActivity').val(); 
+      var subSelect = $('#txSubActivity').empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>'); 
+      $('#divTxSubActivity').addClass('d-none'); 
+      $('#txInfoBox').addClass('d-none'); 
+      
+      if (!actName) return; 
+      var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order) && r.activity === actName); 
+      var subActivities = rows.filter(r => r.subActivity).map(r => r.subActivity); 
+      
+      if (subActivities.length > 0) { 
+          subActivities.forEach(sub => { 
+              var row = rows.find(r => r.subActivity === sub); 
+              subSelect.append(`<option value="${sub}" data-id="${row.id}" data-alloc="${row.allocated}" data-bal="${row.balance}" data-proj="${row.project}" data-dept="${row.dept}" data-order="${row.order}">${sub}</option>`); 
+          }); 
+          $('#divTxSubActivity').removeClass('d-none'); 
+      } else { 
+          var row = rows[0]; if (row) updateTxInfoBox(row.allocated, row.balance, row.id); 
+      } 
+  }
+
+  function showTxBudgetInfo() { 
+      var opt = $('#txSubActivity option:selected'); 
+      if (opt.val()) updateTxInfoBox(opt.data('alloc'), opt.data('bal'), opt.data('id')); 
+  }
+
+  // 2. แก้ไขสีตัวเลขเงินคงเหลือ (updateTxInfoBox)
+  function updateTxInfoBox(alloc, bal, id) { 
+      $('#tx_alloc').text(Number(alloc).toLocaleString()); 
+      
+      // คำนวณเปอร์เซ็นต์คงเหลือ
+      var pct = (alloc > 0) ? (bal / alloc * 100) : 0;
+      var colorClass = 'text-primary'; // ค่าเริ่มต้น (สีน้ำเงิน >= 50%)
+
+      // [UPDATED] Logic สีตามเงื่อนไข
+      if (pct < 20) {
+          colorClass = 'text-danger';   // น้อยกว่า 20% -> สีแดง
+      } else if (pct < 50) {
+          colorClass = 'text-success';  // 20% ถึง 49.99% -> สีเขียว
+      } 
+      // ตั้งแต่ 50% ขึ้นไป -> สีน้ำเงิน (default)
+
+      // อัปเดตตัวเลขและสี
+      $('#tx_bal')
+          .text(Number(bal).toLocaleString())
+          .removeClass('text-primary text-danger text-success text-warning') // ล้างสีเก่า
+          .addClass(colorClass); // ใส่สีใหม่
+
+      $('#txInfoBox').attr('data-id', id).removeClass('d-none'); 
+  }
+
+  function clearTxForm() { 
+      $('#txActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>').trigger('change').prop('disabled', true); 
+      $('#divTxSubActivity').addClass('d-none'); 
+      $('#txInfoBox').addClass('d-none'); 
+      $('#txProjectInfo').addClass('d-none');
+  }
+
+  function openTxModal() {
+      $('#txForm')[0].reset();
+      clearTxForm(); 
+      $('#txOrder').val(null).trigger('change'); 
+      document.getElementById('txDate').valueAsDate = new Date(); 
+      new bootstrap.Modal(document.getElementById('txModal')).show();
+  }
+
+  function loadTxHistory() { 
+      $('#txHistoryTable').html('<tr><td colspan="6" class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-success"></i><div class="mt-2 text-muted">กำลังโหลดข้อมูล...</div></td></tr>'); 
+      google.script.run.withSuccessHandler(renderTxTable).getTransactionHistory(); 
+  }
+
+  function renderTxTable(rows) {
+      if ($.fn.DataTable.isDataTable('#tableTxHistoryNew')) { $('#tableTxHistoryNew').DataTable().destroy(); }
+      var tbody = $('#txHistoryTable'); tbody.empty();
+      
+      if (!rows || rows.length === 0) {
+          tbody.append('<tr><td colspan="6" class="text-center py-5 text-muted"><i class="fas fa-inbox fa-3x mb-3 opacity-25"></i><br>ยังไม่มีรายการเบิกจ่าย</td></tr>');
+          return;
+      }
+      
+      rows.forEach(r => {
+          var sourceBadge = (r.source && (r.source.includes('Non') || r.source.includes('นอก')))
+              ? '<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 ms-1">Non-MOPH</span>' 
+              : '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1">MOPH</span>';
+          var dateParts = r.date.split(' '); 
+          var dateShow = `<div class="fw-bold text-dark">${dateParts[0]}</div><div class="small text-muted">${dateParts[1] || ''}</div>`;
+          var amountShow = Number(Math.abs(r.amount)).toLocaleString();
+
+          tbody.append(`
+            <tr>
+                <td class="ps-4 text-center text-muted fw-bold">${r.order}</td>
+                <td>${dateShow}</td>
+                <td>
+                    <div class="fw-bold text-dark text-wrap" style="line-height: 1.4;">${r.project}</div>
+                    <div class="small text-muted text-wrap mt-1">${r.activity}</div>
+                </td>
+                <td>
+                    <div class="text-wrap text-muted small" style="line-height: 1.4;">${r.desc || '-'}</div>
+                    <div class="mt-1"><span class="badge bg-secondary fw-normal">${r.type}</span> ${sourceBadge}</div>
+                </td>
+                <td class="text-end pe-4">
+                    <span class="h6 fw-bold text-primary mb-0">${amountShow}</span>
+                </td>
+                <td class="text-center">
+                    <div class="d-flex justify-content-center gap-1">
+                        <button class="btn btn-sm btn-light text-warning hover-warning" title="แก้ไข" onclick="confirmTxAction('edit', '${r.order}')"><i class="fas fa-pen"></i></button>
+                        <button class="btn btn-sm btn-light text-danger hover-danger" title="ลบรายการ" onclick="confirmTxAction('delete', '${r.order}')"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </td>
+            </tr>`);
+      });
+
+      $('#tableTxHistoryNew').DataTable({ 
+          "pageLength": 10, "lengthChange": false, "searching": true,
+          "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" }, "emptyTable": "ไม่พบข้อมูล" },
+          "order": [] 
+      });
+  }
+
+  function confirmTxAction(action, id) {
+      if (action === 'delete') {
+          Swal.fire({
+              title: 'ยืนยันการลบ?', text: `ต้องการลบรายการลำดับที่ ${id} ใช่หรือไม่?`, icon: 'warning',
+              showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'ยืนยันลบ', cancelButtonText: 'ยกเลิก'
+          }).then((res) => { if (res.isConfirmed) Swal.fire('แจ้งเตือน', 'ระบบลบข้อมูลจำลองเรียบร้อย', 'success'); });
+      } else if (action === 'edit') {
+          Swal.fire({
+              title: 'ต้องการแก้ไข?', text: `เปิดหน้าต่างแก้ไขรายการ ${id}`, icon: 'question',
+              showCancelButton: true, confirmButtonColor: '#ffc107', confirmButtonText: 'แก้ไข', cancelButtonText: 'ยกเลิก'
+          }).then((res) => { if (res.isConfirmed) Swal.fire('แจ้งเตือน', 'ระบบเตรียมข้อมูลแก้ไข', 'info'); });
+      }
+  }
+
+  function submitTransaction() { 
+      var amount = parseFloat($('#txAmount').val()); 
+      if(!amount) { Swal.fire('เตือน','กรุณาระบุจำนวนเงิน','warning'); return; }
+      var projectId = $('#txInfoBox').attr('data-id'); 
+      if(!projectId) { Swal.fire('เตือน','กรุณาเลือกโครงการ','warning'); return; }
+
+      var formData = { 
+          projectId: projectId, dept: $('#tx_disp_dept').text(), project: $('#tx_disp_proj').text(), 
+          activity: $('#txActivity').val(), txDate: $('#txDate').val(), amount: amount, 
+          expenseType: $('#txExpenseType').val(), desc: $('#txDesc').val() 
+      }; 
+
+      $('#btnSaveTx').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>กำลังบันทึก...'); 
+      google.script.run.withSuccessHandler(function(res) { 
+          $('#btnSaveTx').prop('disabled', false).html('<i class="fas fa-save me-2"></i>บันทึกข้อมูล'); 
+          if (res.status === 'success') { 
+              bootstrap.Modal.getInstance(document.getElementById('txModal')).hide();
+              Swal.fire({ icon: 'success', title: 'บันทึกสำเร็จ', timer: 1500, showConfirmButton: false });
+              refreshMasterData(); loadTxHistory(); 
+          } 
+      }).saveTransaction(formData); 
+  }
+
+  // ==========================================
+  // 6. SUMMARY REPORT
+  // ==========================================
   function loadSummary() {
-      var q = $('#sumQuarter').val();
-      var m = $('#sumMonth').val();
-      
-      // Loading Indicator
+      var q = $('#sumQuarter').val(); var m = $('#sumMonth').val();
       $('#s-total-alloc').html('<i class="fas fa-spinner fa-spin"></i>');
-      
       google.script.run.withSuccessHandler(renderSummaryPage).getSummaryData(q, m);
   }
 
   function renderSummaryPage(data) {
       if(data.error) { Swal.fire('Error', data.error, 'error'); return; }
-      
       var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
       
-      // 1. Update Scorecards
       $('#s-total-alloc').text(fmt(data.grandTotal.allocated));
       $('#s-total-spent').text(fmt(data.grandTotal.spent));
       $('#s-total-bal').text(fmt(data.grandTotal.allocated - data.grandTotal.spent));
       var pct = (data.grandTotal.allocated > 0) ? (data.grandTotal.spent / data.grandTotal.allocated * 100) : 0;
       $('#s-total-pct').text(pct.toFixed(2) + '%');
 
-      // 2. Render Charts (กราฟยังคงใช้ข้อมูลเดิมที่เรียงตามยอดงบประมาณ เพื่อแสดง Top 5 Budget)
       renderSummaryCharts(data); 
 
-      // 3. Render Table 1: Source (ตารางแยกแหล่งเงิน)
       var tSource = $('#tableSourceBody').empty();
       data.bySource.forEach(s => {
           var bal = s.allocated - s.spent;
           var p = (s.allocated > 0) ? (s.spent / s.allocated * 100) : 0;
           var badgeColor = (p >= 80) ? 'bg-success' : (p >= 50 ? 'bg-warning text-dark' : 'bg-danger');
-          tSource.append(`<tr>
-              <td class="ps-4 fw-bold">${s.name}</td>
-              <td class="text-center">${s.count}</td>
-              <td class="text-end text-primary">${fmt(s.allocated)}</td>
-              <td class="text-end text-danger">${fmt(s.spent)}</td>
-              <td class="text-center"><span class="badge ${badgeColor}">${p.toFixed(2)}%</span></td>
-              <td class="text-end pe-4 fw-bold">${fmt(bal)}</td>
-          </tr>`);
+          tSource.append(`<tr><td class="ps-4 fw-bold">${s.name}</td><td class="text-center">${s.count}</td><td class="text-end text-primary">${fmt(s.allocated)}</td><td class="text-end text-danger">${fmt(s.spent)}</td><td class="text-center"><span class="badge ${badgeColor}">${p.toFixed(2)}%</span></td><td class="text-end pe-4 fw-bold">${fmt(bal)}</td></tr>`);
       });
 
-      // 4. Render Table 2 (3 Tabs) - [แก้ไข: เรียงลำดับตามความก้าวหน้าจาก มาก -> น้อย]
-      // ฟังก์ชันช่วยเรียงลำดับ (ใช้ slice() เพื่อไม่ให้กระทบข้อมูลต้นฉบับของกราฟ)
       var sortProg = (arr) => arr.slice().sort((a, b) => {
           var pA = (a.allocated > 0) ? (a.spent / a.allocated) : 0;
           var pB = (b.allocated > 0) ? (b.spent / b.allocated) : 0;
-          return pB - pA; // เรียง Percent มาก ขึ้นก่อน
+          return pB - pA; 
       });
-
       renderDeptTable(sortProg(data.byDeptAll), '#tableDeptAllBody');
       renderDeptTable(sortProg(data.byDeptMoph), '#tableDeptMophBody');
       renderDeptTable(sortProg(data.byDeptNon), '#tableDeptNonBody');
   }
 
-  // function renderSummaryPage(data) {
-  //     if(data.error) { Swal.fire('Error', data.error, 'error'); return; }
-      
-  //     var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
-      
-  //     // 1. Update Scorecards
-  //     $('#s-total-alloc').text(fmt(data.grandTotal.allocated));
-  //     $('#s-total-spent').text(fmt(data.grandTotal.spent));
-  //     $('#s-total-bal').text(fmt(data.grandTotal.allocated - data.grandTotal.spent));
-      
-  //     var pct = (data.grandTotal.allocated > 0) ? (data.grandTotal.spent / data.grandTotal.allocated * 100) : 0;
-  //     $('#s-total-pct').text(pct.toFixed(2) + '%');
-
-  //     // 2. Render Charts (Pie & Bar)
-  //     renderSummaryCharts(data);
-
-  //     // 3. Render Table 1: Budget Source
-  //     var tSource = $('#tableSourceBody').empty();
-  //     data.bySource.forEach(s => {
-  //         var bal = s.allocated - s.spent;
-  //         var p = (s.allocated > 0) ? (s.spent / s.allocated * 100) : 0;
-  //         var badgeColor = (p >= 80) ? 'bg-success' : (p >= 50 ? 'bg-warning text-dark' : 'bg-danger');
-          
-  //         tSource.append(`<tr>
-  //             <td class="ps-4 fw-bold">${s.name}</td>
-  //             <td class="text-center">${s.count}</td>
-  //             <td class="text-end text-primary">${fmt(s.allocated)}</td>
-  //             <td class="text-end text-danger">${fmt(s.spent)}</td>
-  //             <td class="text-center"><span class="badge ${badgeColor}">${p.toFixed(2)}%</span></td>
-  //             <td class="text-end pe-4 fw-bold">${fmt(bal)}</td>
-  //         </tr>`);
-  //     });
-
-  //     // 4. Render Table 2: Department Performance (3 Tabs)
-  //     renderDeptTable(data.byDeptAll, '#tableDeptAllBody');
-  //     renderDeptTable(data.byDeptMoph, '#tableDeptMophBody');
-  //     renderDeptTable(data.byDeptNon, '#tableDeptNonBody');
-  // }
-
-  // Helper: Render Dept Table with Clickable Rows
   function renderDeptTable(deptList, tbodyId) {
       var tbody = $(tbodyId).empty();
-      if (!deptList || deptList.length === 0) {
-          tbody.append('<tr><td colspan="6" class="text-center py-3 text-muted">ไม่มีข้อมูล</td></tr>');
-          return;
-      }
+      if (!deptList || deptList.length === 0) { tbody.append('<tr><td colspan="6" class="text-center py-3 text-muted">ไม่มีข้อมูล</td></tr>'); return; }
       var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
       
       deptList.forEach(d => {
@@ -204,287 +438,118 @@
           var p = (d.allocated > 0) ? (d.spent / d.allocated * 100) : 0;
           var colorClass = (p >= 80) ? 'bg-success' : (p >= 50 ? 'bg-warning' : 'bg-danger');
           
-          // เพิ่ม style="cursor: pointer;" และ onclick="openDrillDown(...)"
-          tbody.append(`<tr style="cursor: pointer;" onclick="openDrillDown('${d.name}')" title="คลิกเพื่อดูรายละเอียดโครงการ">
+          tbody.append(`<tr style="cursor: pointer;" onclick="openDrillDown('${d.name}')" title="คลิกเพื่อดูรายละเอียด">
               <td class="ps-4 text-nowrap fw-bold text-primary"><i class="fas fa-search me-2 small opacity-50"></i>${d.name}</td>
-              <td class="text-center">${d.count}</td>
-              <td class="text-end">${fmt(d.allocated)}</td>
-              <td class="text-end">${fmt(d.spent)}</td>
-              <td class="align-middle px-3">
-                  <div class="progress" style="height: 20px;">
-                      <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${p}%">${p.toFixed(1)}%</div>
-                  </div>
-              </td>
-              <td class="text-end pe-4 fw-bold ${bal < 0 ? 'text-danger' : 'text-success'}">${fmt(bal)}</td>
-          </tr>`);
+              <td class="text-center">${d.count}</td><td class="text-end">${fmt(d.allocated)}</td><td class="text-end">${fmt(d.spent)}</td>
+              <td class="align-middle px-3"><div class="progress" style="height: 20px;"><div class="progress-bar ${colorClass}" role="progressbar" style="width: ${p}%">${p.toFixed(1)}%</div></div></td>
+              <td class="text-end pe-4 fw-bold ${bal < 0 ? 'text-danger' : 'text-success'}">${fmt(bal)}</td></tr>`);
       });
   }
 
-  // Helper: Render Department Table Rows
-  // function renderDeptTable(deptList, tbodyId) {
-  //     var tbody = $(tbodyId).empty();
-  //     if (!deptList || deptList.length === 0) {
-  //         tbody.append('<tr><td colspan="6" class="text-center py-3 text-muted">ไม่มีข้อมูล</td></tr>');
-  //         return;
-  //     }
-  //     var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
-      
-  //     deptList.forEach(d => {
-  //         var bal = d.allocated - d.spent;
-  //         var p = (d.allocated > 0) ? (d.spent / d.allocated * 100) : 0;
-  //         var colorClass = (p >= 80) ? 'bg-success' : (p >= 50 ? 'bg-warning' : 'bg-danger');
-          
-  //         tbody.append(`<tr>
-  //             <td class="ps-4 text-nowrap">${d.name}</td>
-  //             <td class="text-center">${d.count}</td>
-  //             <td class="text-end">${fmt(d.allocated)}</td>
-  //             <td class="text-end">${fmt(d.spent)}</td>
-  //             <td class="align-middle px-3">
-  //                 <div class="progress" style="height: 20px;">
-  //                     <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${p}%">${p.toFixed(1)}%</div>
-  //                 </div>
-  //             </td>
-  //             <td class="text-end pe-4 fw-bold ${bal < 0 ? 'text-danger' : 'text-success'}">${fmt(bal)}</td>
-  //         </tr>`);
-  //     });
-  // }
-
   function renderSummaryCharts(data) {
-      // 1. Pie Chart (Source)
       if (summaryPieChart) summaryPieChart.destroy();
       var ctxPie = document.getElementById('chartSource').getContext('2d');
       summaryPieChart = new Chart(ctxPie, {
           type: 'doughnut',
-          data: {
-              labels: data.bySource.map(s => s.name),
-              datasets: [{
-                  data: data.bySource.map(s => s.allocated),
-                  backgroundColor: ['#0d6efd', '#fd7e14', '#20c997', '#ffc107'],
-                  borderWidth: 1
-              }]
-          },
+          data: { labels: data.bySource.map(s => s.name), datasets: [{ data: data.bySource.map(s => s.allocated), backgroundColor: ['#0d6efd', '#fd7e14', '#20c997', '#ffc107'], borderWidth: 1 }] },
           options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
       });
 
-      // 2. Bar Chart (Top 5 Dept - from All)
       if (summaryBarChart) summaryBarChart.destroy();
       var top5 = data.byDeptAll.slice(0, 5);
       var ctxBar = document.getElementById('chartTopDept').getContext('2d');
       summaryBarChart = new Chart(ctxBar, {
           type: 'bar',
-          data: {
-              labels: top5.map(d => d.name.substring(0, 15) + '...'), 
-              datasets: [{
-                  label: 'งบจัดสรร',
-                  data: top5.map(d => d.allocated),
-                  backgroundColor: '#198754',
-                  borderRadius: 4
-              }, {
-                  label: 'เบิกจ่าย',
-                  data: top5.map(d => d.spent),
-                  backgroundColor: '#dc3545',
-                  borderRadius: 4
-              }]
-          },
-          options: { 
-              responsive: true, 
-              maintainAspectRatio: false, 
-              indexAxis: 'y', 
-              scales: { x: { beginAtZero: true } } 
-          }
+          data: { labels: top5.map(d => d.name), datasets: [{ label: 'งบจัดสรร', data: top5.map(d => d.allocated), backgroundColor: '#198754', borderRadius: 4 }, { label: 'เบิกจ่าย', data: top5.map(d => d.spent), backgroundColor: '#dc3545', borderRadius: 4 }] },
+          options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true } } }
       });
   }
 
-  // --- PAGE: SEARCH ACTION PLAN ---
-  function runSearch() { 
-      var dept = $('#searchDeptSelect').val();
-      var type = $('#searchType').val();
-      var quarter = $('#searchQuarter').val();
-      var month = $('#searchMonth').val();
-
-      if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().destroy(); }
-      // Colspan = 7 (Merged Type/Source)
-      $('#searchTableBody').html('<tr><td colspan="7" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>');
+  // --- DRILL DOWN LOGIC ---
+  function openDrillDown(deptName) {
+      CURRENT_DD_DATA = null; 
+      $('#ddTitle').text(deptName);
+      $('#ddAlloc, #ddSpent, #ddProgress').html('<i class="fas fa-spinner fa-spin text-secondary"></i>');
+      $('#ddTableBodyAll, #ddTableBodyMoph, #ddTableBodyNon').html('<tr><td colspan="5" class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-success"></i><div class="mt-2 text-muted">กำลังดึงข้อมูล...</div></td></tr>');
       
-      google.script.run.withSuccessHandler(renderSearchPage).searchActionPlan(dept, type, quarter, month); 
+      var triggerEl = document.querySelector('#deptDrillDownModal button[data-bs-target="#tab-dd-all"]');
+      if (triggerEl) { var tab = bootstrap.Tab.getInstance(triggerEl); if (tab) tab.show(); else new bootstrap.Tab(triggerEl).show(); }
+
+      new bootstrap.Modal(document.getElementById('deptDrillDownModal')).show();
+      var q = $('#sumQuarter').val();
+      var m = $('#sumMonth').val();
+      google.script.run.withSuccessHandler(renderDrillDownData).getDeptDetails(deptName, q, m);
   }
 
-  function resetSearch() { 
-      $('#searchDeptSelect').val('').trigger('change'); 
-      $('#searchType').val('');
-      $('#searchQuarter').val('');
-      $('#searchMonth').val('');
-      
-      $('#sum-count').text('0');
-      $('#sum-approved').text('0.00');
-      $('#sum-allocated').text('0.00');
+  function renderDrillDownData(data) {
+      if(data.error) { $('#ddTableBodyAll').html(`<tr><td colspan="5" class="text-center text-danger">${data.error}</td></tr>`); return; }
+      CURRENT_DD_DATA = data;
+      renderProjectTable(data.projectsAll, '#ddTableBodyAll');
+      renderProjectTable(data.projectsMoph, '#ddTableBodyMoph');
+      renderProjectTable(data.projectsNon, '#ddTableBodyNon');
+      updateDrillDownCards('all');
 
-      if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().clear().destroy(); }
-      $('#searchTableBody').empty(); 
+      $('button[data-bs-toggle="tab"]').off('shown.bs.tab').on('shown.bs.tab', function (e) {
+          var t = $(e.target).attr("data-bs-target"); 
+          if (t === '#tab-dd-all') updateDrillDownCards('all');
+          if (t === '#tab-dd-moph') updateDrillDownCards('moph');
+          if (t === '#tab-dd-non') updateDrillDownCards('non');
+      });
   }
 
-  function renderSearchPage(data) { 
-      if(data.error) { 
-          $('#searchTableBody').html('<tr><td colspan="7" class="text-danger">'+data.error+'</td></tr>'); 
-          return; 
-      } 
-      var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2}); 
-      $('#sum-count').text(Number(data.summary.count).toLocaleString()); 
-      $('#sum-approved').text(fmt(data.summary.approved)); 
-      $('#sum-allocated').text(fmt(data.summary.allocated)); 
-      
-      if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().destroy(); } 
-      var tbody = $('#searchTableBody'); 
-      tbody.empty(); 
-      
-      data.list.forEach(function(row) { 
-          var timelineHtml = getTimelineDisplayHtml(row.timeline); 
-          tbody.append(`<tr>
-              <td class="ps-3">${row.order}</td>
-              <td><span class="badge bg-light text-dark border">${row.dept}</span></td>
-              <td><div class="fw-bold text-wrap">${row.project}</div><div class="small text-muted">${row.activity}</div></td>
-              <td><span class="badge bg-white text-dark border border-secondary text-wrap" style="line-height: 1.4;">${row.budgetType} / ${row.budgetSource}</span></td>
-              <td class="text-center text-nowrap">${timelineHtml}</td>
-              <td class="text-end text-primary">${fmt(row.approved)}</td>
-              <td class="text-end fw-bold text-success">${fmt(row.allocated)}</td>
-          </tr>`); 
-      }); 
-      
-      $('#searchTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] }); 
+    // ==========================================
+    // Modal แสดงรายละเอียดกลุ่มงาน
+    // ==========================================
+    function renderProjectTable(projectList, tbodyId) {
+        var tbody = $(tbodyId).empty();
+        
+        if (!projectList || projectList.length === 0) { 
+            tbody.append('<tr><td colspan="5" class="text-center py-3 text-muted">ไม่พบข้อมูล</td></tr>'); 
+            return; 
+        }
+        
+        var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
+
+        projectList.forEach(p => {
+            var pct = p.progress || 0;
+            var colorClass = (pct >= 80) ? 'bg-success' : (pct >= 50 ? 'bg-warning text-dark' : 'bg-danger');
+            
+            // ปรับสีตัวเลขคงเหลือ (ถ้าติดลบให้แดง)
+            var balColor = (p.balance < 0) ? 'text-danger' : 'text-success';
+
+            var html = `
+                <tr>
+                    <td class="ps-3">
+                        <div class="fw-bold text-dark text-wrap" style="font-size: 0.95rem;">${p.project}</div>
+                        <div class="small text-muted mt-1"><i class="fas fa-tasks me-1 opacity-50"></i>${p.activity}</div>
+                    </td>
+                    <td class="text-end fw-bold text-secondary">${fmt(p.allocated)}</td>
+                    <td class="text-end fw-bold text-danger">${fmt(p.spent)}</td>
+                    <td class="align-middle px-2">
+                        <div class="progress" style="height: 18px; background-color: #e9ecef;">
+                            <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${pct}%">${pct.toFixed(1)}%</div>
+                        </div>
+                    </td>
+                    <td class="text-end pe-3 fw-bold ${balColor}">${fmt(p.balance)}</td>
+                </tr>
+            `;
+            tbody.append(html);
+        });
+    }
+
+  function updateDrillDownCards(type) {
+      if (!CURRENT_DD_DATA) return;
+      var s = (type === 'moph') ? CURRENT_DD_DATA.sumMoph : (type === 'non' ? CURRENT_DD_DATA.sumNon : CURRENT_DD_DATA.sumAll);
+      var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
+      $('#ddAlloc, #ddSpent, #ddProgress').hide().fadeIn(200);
+      $('#ddAlloc').text(fmt(s.allocated)); $('#ddSpent').text(fmt(s.spent));
+      var pct = (s.allocated > 0) ? (s.spent / s.allocated * 100) : 0;
+      $('#ddProgress').text(pct.toFixed(2) + '%');
   }
 
-  // --- PAGE: YEARLY PLAN ---
-  function loadYearlyData() { 
-      var dept = $('#yearlyDeptSelect').val();
-      var type = $('#yearlyType').val();
-      var quarter = $('#yearlyQuarter').val();
-      var month = $('#yearlyMonth').val();
-
-      if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().destroy(); }
-      // Colspan = 8 (Merged Type/Source)
-      $('#yearlyTableBody').html('<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>');
-      
-      google.script.run.withSuccessHandler(renderYearlyPage).getYearlyPlanData(dept, type, quarter, month); 
-  }
-
-  function resetYearly() { 
-      $('#yearlyDeptSelect').val('').trigger('change'); 
-      $('#yearlyType').val('');
-      $('#yearlyQuarter').val('');
-      $('#yearlyMonth').val(''); 
-      
-      $('#yp-count').text('0');
-      $('#yp-approved').text('0.00');
-      $('#yp-allocated').text('0.00');
-
-      if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().clear().destroy(); }
-      $('#yearlyTableBody').empty(); 
-  }
-
-  function renderYearlyPage(data) { 
-      if(data.error) { 
-          $('#yearlyTableBody').html('<tr><td colspan="8" class="text-danger">'+data.error+'</td></tr>'); 
-          return; 
-      } 
-      var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2}); 
-      $('#yp-count').text(Number(data.summary.projects).toLocaleString()); 
-      $('#yp-approved').text(fmt(data.summary.approved)); 
-      $('#yp-allocated').text(fmt(data.summary.allocated)); 
-      
-      if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().destroy(); } 
-      var tbody = $('#yearlyTableBody'); 
-      tbody.empty(); 
-      
-      data.list.forEach(row => { 
-          var timelineHtml = getTimelineDisplayHtml(row.timeline); 
-          tbody.append(`<tr>
-              <td class="ps-3">${row.order}</td>
-              <td><span class="badge bg-light text-dark border">${row.dept}</span></td>
-              <td><div class="fw-bold text-wrap" style="font-size: 1rem;">${row.project}</div><div class="small text-muted mt-1"><i class="fas fa-tasks me-1"></i>${row.activity}</div></td>
-              <td><span class="badge bg-white text-dark border border-secondary text-wrap" style="line-height: 1.4;">${row.type} / ${row.budgetSource}</span></td>
-              <td class="text-center text-nowrap">${timelineHtml}</td>
-              <td class="text-end">${fmt(row.allocated)}</td>
-              <td class="text-end">${fmt(row.spent)}</td>
-              <td class="text-end pe-3 fw-bold ${row.balance < 0 ? 'text-danger':'text-success'}">${fmt(row.balance)}</td>
-          </tr>`); 
-      }); 
-      
-      $('#yearlyTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] }); 
-  }
-
-  function initYearlyPage() { /* Placeholder */ }
-
-  // --- PAGE: DASHBOARD ---
-  function loadDashboardData() { google.script.run.withSuccessHandler(renderDashboard).getDashboardData(); }
-  function renderDashboard(data) { if(!data || data.error) { $('#moph-approved').html('<span class="text-danger fs-6">' + (data ? data.error : "Error") + '</span>'); return; } updateCards('moph', data.moph); renderGauge('mophGauge', data.moph); renderBarChart('mophBar', data.moph.deptStats, '#198754'); updateCards('nonmoph', data.nonMoph); renderGauge('nonMophGauge', data.nonMoph); renderBarChart('nonMophBar', data.nonMoph.deptStats, '#0d6efd'); }
-  function updateCards(prefix, stats) { var fmt = (num) => Number(num).toLocaleString(undefined, {minimumFractionDigits: 2}); $('#' + prefix + '-approved').text(fmt(stats.approved)); $('#' + prefix + '-allocated').text(fmt(stats.allocated)); $('#' + prefix + '-spent').text(fmt(stats.spent)); $('#' + prefix + '-balance').text(fmt(stats.balance)); }
-  function renderGauge(canvasId, stats) { var alloc = stats.allocated || 0; var spent = stats.spent || 0; var percent = alloc > 0 ? (spent / alloc) * 100 : 0; $('#' + canvasId + 'Text').text(percent.toFixed(2) + '%'); new Chart(document.getElementById(canvasId), { type: 'doughnut', data: { labels: ['เบิกจ่าย', 'คงเหลือ'], datasets: [{ data: [percent, 100 - percent], backgroundColor: ['#dc3545', '#e9ecef'], borderWidth: 0, hoverOffset: 0 }] }, options: { responsive: true, maintainAspectRatio: false, rotation: -90, circumference: 180, cutout: '80%', plugins: { legend: {display:false}, tooltip: {enabled:false} } } }); }
-  function renderBarChart(canvasId, deptStats, colorTheme) { var chartData = []; for (var dept in deptStats) { var alloc = deptStats[dept].allocated; var spent = deptStats[dept].spent; var pct = alloc > 0 ? (spent / alloc) * 100 : 0; if(alloc > 0) chartData.push({ label: dept, y: pct }); } chartData.sort((a, b) => b.y - a.y); new Chart(document.getElementById(canvasId), { type: 'bar', data: { labels: chartData.map(d => d.label), datasets: [{ data: chartData.map(d => d.y), backgroundColor: colorTheme, borderRadius: 4, barPercentage: 0.6 }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'x', plugins: { legend: {display:false}, tooltip: { callbacks: { label: (c) => c.raw.toFixed(2) + '%' } } }, scales: { y: { beginAtZero: true, max: 100, ticks: { callback: (v) => v + "%" } }, x: { grid: {display:false} } } } }); }
-
-  // --- CASCADING DROPDOWNS ---
-  function onCascadingChange(prefix, level) {
-      var order = $('#'+prefix+'Order').val();
-      var projSel = $('#'+prefix+'Proj');
-      var actSel = $('#'+prefix+'Act');
-      var subSel = $('#'+prefix+'Sub');
-      var divSub = $('#wrapper_'+prefix+'_sub');
-
-      if (level === 'order') {
-          projSel.empty().append('<option value="">-- เลือกโครงการ --</option>').prop('disabled', true);
-          actSel.empty().append('<option value="">-- ทั้งหมด --</option>').prop('disabled', true);
-          subSel.empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>').prop('disabled', true);
-          divSub.addClass('d-none');
-          
-          if (!order) return;
-          var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order));
-          var projects = [...new Set(rows.map(r => r.project))].sort();
-          projects.forEach(p => projSel.append(new Option(p, p)));
-          projSel.prop('disabled', false);
-      }
-      else if (level === 'proj') {
-          var proj = projSel.val();
-          actSel.empty().append('<option value="">-- ทั้งหมด --</option>').prop('disabled', true);
-          subSel.empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>').prop('disabled', true);
-          divSub.addClass('d-none');
-          
-          if (!proj) return;
-          var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order) && r.project === proj);
-          var activities = [...new Set(rows.map(r => r.activity))].sort();
-          activities.forEach(a => actSel.append(new Option(a, a)));
-          actSel.prop('disabled', false);
-      }
-      else if (level === 'act') {
-          var proj = projSel.val();
-          var act = actSel.val();
-          subSel.empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>').prop('disabled', true);
-          
-          if(!act) { divSub.addClass('d-none'); return; }
-          
-          var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order) && r.project === proj && r.activity === act);
-          var subActivities = [...new Set(rows.map(r => r.subActivity).filter(s => s && String(s).trim() !== ""))].sort();
-          
-          if (subActivities.length > 0) {
-              divSub.removeClass('d-none'); 
-              subActivities.forEach(s => subSel.append(new Option(s, s)));
-              subSel.prop('disabled', false);
-          } else {
-              divSub.addClass('d-none');
-          }
-      }
-  }
-
-  // --- TRANSACTION FORM LOGIC ---
-  function onTxOrderChange() { var order = $('#txOrder').val(); var select = $('#txActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>'); $('#divTxSubActivity').addClass('d-none'); $('#txSubActivity').empty(); $('#txInfoBox').addClass('d-none'); if(!order) { select.trigger('change').prop('disabled', true); $('#txProjectInfo').addClass('d-none'); return; } var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order)); if (rows.length > 0) { $('#tx_disp_proj').text(rows[0].project); $('#tx_disp_dept').text(rows[0].dept); $('#txProjectInfo').removeClass('d-none'); var activities = [...new Set(rows.map(r => r.activity))].sort(); activities.forEach(act => { select.append(`<option value="${act}">${act}</option>`); }); select.trigger('change').prop('disabled', false); } }
-  function onTxActivityChange() { var order = $('#txOrder').val(); var actName = $('#txActivity').val(); var subSelect = $('#txSubActivity').empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>'); $('#divTxSubActivity').addClass('d-none'); $('#txInfoBox').addClass('d-none'); if (!actName) return; var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order) && r.activity === actName); var subActivities = rows.filter(r => r.subActivity).map(r => r.subActivity); if (subActivities.length > 0) { subActivities.forEach(sub => { var row = rows.find(r => r.subActivity === sub); subSelect.append(`<option value="${sub}" data-id="${row.id}" data-alloc="${row.allocated}" data-bal="${row.balance}" data-proj="${row.project}" data-dept="${row.dept}" data-order="${row.order}">${sub}</option>`); }); $('#divTxSubActivity').removeClass('d-none'); } else { var row = rows[0]; if (row) updateTxInfoBox(row.allocated, row.balance, row.id); } }
-  function showTxBudgetInfo() { var opt = $('#txSubActivity option:selected'); if (opt.val()) updateTxInfoBox(opt.data('alloc'), opt.data('bal'), opt.data('id')); }
-  function updateTxInfoBox(alloc, bal, id) { $('#tx_alloc').text(Number(alloc).toLocaleString()); $('#tx_bal').text(Number(bal).toLocaleString()); $('#txInfoBox').attr('data-id', id).removeClass('d-none'); }
-  function clearTxForm() { $('#txActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>').trigger('change').prop('disabled', true); $('#divTxSubActivity').addClass('d-none'); $('#txInfoBox').addClass('d-none'); $('#txProjectInfo').addClass('d-none'); }
-  function submitTransaction() { var amount = parseFloat($('#txAmount').val()); if(!amount) return; var projectId = $('#txInfoBox').attr('data-id'); var formData = { projectId: projectId, dept: $('#tx_disp_dept').text(), project: $('#tx_disp_proj').text(), activity: $('#txActivity').val(), txDate: $('#txDate').val(), amount: amount, expenseType: $('#txExpenseType').val(), desc: $('#txDesc').val() }; $('#btnSaveTx').prop('disabled', true).text('Saving...'); google.script.run.withSuccessHandler(function(res) { $('#btnSaveTx').prop('disabled', false).text('บันทึกและตัดยอด'); if (res.status === 'success') { Swal.fire('สำเร็จ', res.message, 'success'); clearTxForm(); $('#txOrder').val(null).trigger('change'); $('#txForm')[0].reset(); refreshMasterData(); loadTxHistory(); } }).saveTransaction(formData); }
-  function resetTxSearch() { $('#searchTxOrder').val(null).trigger('change.select2'); $('#searchTxProj').empty().append('<option value="">-- เลือกโครงการ --</option>').prop('disabled', true); $('#searchTxAct').empty().append('<option value="">-- ทั้งหมด --</option>').prop('disabled', true); $('#searchTxSub').empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>').prop('disabled', true); $('#wrapper_searchTx_sub').addClass('d-none'); loadTxHistory(); }
-  function loadTxHistory() { $('#txHistoryTable').html('<tr><td colspan="5" class="text-center py-3"><i class="fas fa-spinner fa-spin"></i></td></tr>'); google.script.run.withSuccessHandler(renderTxTable).getTransactionHistory(); }
-  function renderTxTable(rows) { if ($.fn.DataTable.isDataTable('#tableTxHistory')) { $('#tableTxHistory').DataTable().destroy(); } var tbody = $('#txHistoryTable'); tbody.empty(); if (!rows || rows.length === 0) { tbody.append('<tr><td colspan="5" class="text-center py-3">ไม่พบข้อมูล</td></tr>'); return; } rows.forEach(r => { var activityHtml = `<div class="fw-bold text-dark">${r.project}</div><div class="small text-muted">${r.activity}</div>`; if (r.subActivity) { activityHtml += `<div class="small text-muted fst-italic">(${r.subActivity})</div>`; } var amt = Number(Math.abs(r.amount)).toLocaleString(); tbody.append(`<tr><td class="ps-3 text-center">${r.order}</td><td>${activityHtml}</td><td class="text-nowrap">${r.date}</td><td><span class="badge bg-secondary fw-normal">${r.type}</span></td><td class="text-end pe-3 fw-bold text-danger">${amt}</td></tr>`); }); $('#tableTxHistory').DataTable({ "pageLength": 5, "lengthChange": false, "searching": false, "language": { "paginate": { "next": ">", "previous": "<" }, "emptyTable": "ไม่พบข้อมูล" } }); }
-
-  // --- LOAN FORM LOGIC ---
+  // ==========================================
+  // 7. LOAN LOGIC & SEARCH
+  // ==========================================
   function onLoanOrderChange() { var order = $('#loanOrder').val(); var select = $('#loanActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>'); $('#divLoanSubActivity').addClass('d-none'); $('#loanSubActivity').empty(); $('#loanInfoBox').addClass('d-none'); if(!order) { select.trigger('change').prop('disabled', true); $('#loanProjectInfo').addClass('d-none'); return; } var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order)); if (rows.length > 0) { $('#loan_disp_proj').text(rows[0].project); $('#loan_disp_dept').text(rows[0].dept); $('#loanProjectInfo').removeClass('d-none'); var activities = [...new Set(rows.map(r => r.activity))].sort(); activities.forEach(act => { select.append(`<option value="${act}">${act}</option>`); }); select.trigger('change').prop('disabled', false); } }
   function onLoanActivityChange() { var order = $('#loanOrder').val(); var actName = $('#loanActivity').val(); var subSelect = $('#loanSubActivity').empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>'); $('#divLoanSubActivity').addClass('d-none'); $('#loanInfoBox').addClass('d-none'); if (!actName) return; var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order) && r.activity === actName); var subActivities = rows.filter(r => r.subActivity && r.subActivity !== "").map(r => r.subActivity); if (subActivities.length > 0) { subActivities.forEach(sub => { var row = rows.find(r => r.subActivity === sub); var option = new Option(sub, sub); $(option).data('row', row); subSelect.append(option); }); $('#divLoanSubActivity').removeClass('d-none'); } else { var row = rows[0]; if (row) updateLoanInfoBox(row); } }
   function showLoanBudgetInfoFromSub() { var opt = $('#loanSubActivity option:selected'); var rowData = $(opt).data('row'); if (rowData) updateLoanInfoBox(rowData); }
@@ -498,111 +563,50 @@
   function openRepaymentModal(timestamp, project, loanAmt, balance) { $('#rpTimestamp').val(timestamp); $('#rpProject').text(project); $('#rpLoanAmount').text(Number(loanAmt).toLocaleString()); $('#rpBalance').text(Number(balance).toLocaleString()); $('#rpAmount').val(''); document.getElementById('rpDate').valueAsDate = new Date(); var modal = new bootstrap.Modal(document.getElementById('repaymentModal')); modal.show(); }
   function submitRepayment() { var timestamp = $('#rpTimestamp').val(); var amount = parseFloat($('#rpAmount').val()); var date = $('#rpDate').val(); if (!amount) { Swal.fire('เตือน', 'ระบุยอดเงิน', 'warning'); return; } google.script.run.withSuccessHandler(function(res) { if (res.status === 'success') { Swal.fire('สำเร็จ', res.message, 'success'); $('#repaymentModal').modal('hide'); $('.modal-backdrop').remove(); runLoanSearch(); } }).updateLoanRepayment({ timestamp: timestamp, paidAmount: amount, payDate: date }); }
 
-  // Helper
+  function onCascadingChange(prefix, level) {
+      var order = $('#'+prefix+'Order').val();
+      var projSel = $('#'+prefix+'Proj');
+      var actSel = $('#'+prefix+'Act');
+      var subSel = $('#'+prefix+'Sub');
+      var divSub = $('#wrapper_'+prefix+'_sub');
+
+      if (level === 'order') {
+          projSel.empty().append('<option value="">-- เลือกโครงการ --</option>').prop('disabled', true);
+          actSel.empty().append('<option value="">-- ทั้งหมด --</option>').prop('disabled', true);
+          subSel.empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>').prop('disabled', true);
+          divSub.addClass('d-none');
+          if (!order) return;
+          var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order));
+          var projects = [...new Set(rows.map(r => r.project))].sort();
+          projects.forEach(p => projSel.append(new Option(p, p)));
+          projSel.prop('disabled', false);
+      }
+      else if (level === 'proj') {
+          var proj = projSel.val();
+          actSel.empty().append('<option value="">-- ทั้งหมด --</option>').prop('disabled', true);
+          subSel.empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>').prop('disabled', true);
+          divSub.addClass('d-none');
+          if (!proj) return;
+          var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order) && r.project === proj);
+          var activities = [...new Set(rows.map(r => r.activity))].sort();
+          activities.forEach(a => actSel.append(new Option(a, a)));
+          actSel.prop('disabled', false);
+      }
+      else if (level === 'act') {
+          var proj = projSel.val(); var act = actSel.val();
+          subSel.empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>').prop('disabled', true);
+          if(!act) { divSub.addClass('d-none'); return; }
+          var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order) && r.project === proj && r.activity === act);
+          var subActivities = [...new Set(rows.map(r => r.subActivity).filter(s => s && String(s).trim() !== ""))].sort();
+          if (subActivities.length > 0) { divSub.removeClass('d-none'); subActivities.forEach(s => subSel.append(new Option(s, s))); subSel.prop('disabled', false); } else { divSub.addClass('d-none'); }
+      }
+  }
   function getTimelineDisplayHtml(timeline) { var months = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.']; var activeCount = timeline.filter(x => x).length; if (activeCount === 0) return '-'; if (activeCount === 12) return '<span class="badge bg-success rounded-pill fw-normal">ทั้งปีงบประมาณ</span>'; var html = '<div class="d-flex flex-wrap gap-1 justify-content-center flex-column align-items-start">'; var quarters = [ { name: 'ไตรมาส 1', indices: [0, 1, 2] }, { name: 'ไตรมาส 2', indices: [3, 4, 5] }, { name: 'ไตรมาส 3', indices: [6, 7, 8] }, { name: 'ไตรมาส 4', indices: [9, 10, 11] } ]; quarters.forEach(function(q) { var activeInQ = q.indices.filter(idx => timeline[idx]); if (activeInQ.length === 3) { html += `<span class="badge bg-primary rounded-pill fw-normal mb-1">${q.name}</span>`; } else if (activeInQ.length > 0) { var monthBadges = activeInQ.map(idx => `<span class="badge bg-success fw-normal">${months[idx]}</span>`).join(' '); html += `<div class="mb-1"><strong class="text-secondary small me-1">${q.name} :</strong>${monthBadges}</div>`; } }); html += '</div>'; return html; }
-
-  // ตัวแปร Global สำหรับเก็บข้อมูล DrillDown ปัจจุบัน
-  var CURRENT_DD_DATA = null;
-
-  // --- DRILL-DOWN LOGIC ---
-  function openDrillDown(deptName) {
-      // 1. [สำคัญ] ล้างค่าข้อมูลเก่าทิ้งทันที เพื่อกันค่าค้าง
-      CURRENT_DD_DATA = null; 
-
-      // 2. รีเซ็ตข้อความบนหัวเรื่อง และ Card ให้หมุนรอ (Loading)
-      $('#ddTitle').text(deptName);
-      $('#ddAlloc').html('<i class="fas fa-spinner fa-spin text-secondary"></i>');
-      $('#ddSpent').html('<i class="fas fa-spinner fa-spin text-secondary"></i>');
-      $('#ddProgress').html('<i class="fas fa-spinner fa-spin text-secondary"></i>');
-      
-      // 3. รีเซ็ตตารางให้หมุนรอ
-      var loadingHtml = '<tr><td colspan="5" class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-success"></i><div class="mt-2 text-muted">กำลังดึงข้อมูลโครงการ...</div></td></tr>';
-      $('#ddTableBodyAll, #ddTableBodyMoph, #ddTableBodyNon').html(loadingHtml);
-      
-      // 4. บังคับดีดกลับมาที่ Tab แรก (ทั้งหมด) เสมอ
-      var triggerEl = document.querySelector('#deptDrillDownModal button[data-bs-target="#tab-dd-all"]');
-      if (triggerEl) {
-          var tabInstance = bootstrap.Tab.getInstance(triggerEl);
-          if (tabInstance) tabInstance.show();
-          else new bootstrap.Tab(triggerEl).show();
-      }
-
-      // 5. เปิด Modal
-      new bootstrap.Modal(document.getElementById('deptDrillDownModal')).show();
-
-      // 6. ดึงข้อมูลใหม่
-      var q = $('#sumQuarter').val();
-      var m = $('#sumMonth').val();
-      google.script.run.withSuccessHandler(renderDrillDownData).getDeptDetails(deptName, q, m);
-  }
-
-  function renderDrillDownData(data) {
-      if(data.error) { $('#ddTableBodyAll').html(`<tr><td colspan="5" class="text-center text-danger">${data.error}</td></tr>`); return; }
-
-      // 1. เก็บข้อมูลลงตัวแปร Global เพื่อใช้ตอนสลับแท็บ
-      CURRENT_DD_DATA = data;
-
-      // 2. Render ตารางทั้ง 3 แท็บรอไว้เลย
-      renderProjectTable(data.projectsAll, '#ddTableBodyAll');
-      renderProjectTable(data.projectsMoph, '#ddTableBodyMoph');
-      renderProjectTable(data.projectsNon, '#ddTableBodyNon');
-
-      // 3. อัปเดตการ์ดครั้งแรก (Default: All)
-      updateDrillDownCards('all');
-
-      // 4. ผูก Event Listener ให้ปุ่มแท็บ (ทำครั้งเดียวก็พอ แต่ทำซ้ำก็ไม่เสียหายมากในที่นี้)
-      $('button[data-bs-toggle="tab"]').off('shown.bs.tab').on('shown.bs.tab', function (e) {
-          var target = $(e.target).attr("data-bs-target"); // ได้ค่า #tab-dd-all, #tab-dd-moph, ...
-          if (target === '#tab-dd-all') updateDrillDownCards('all');
-          if (target === '#tab-dd-moph') updateDrillDownCards('moph');
-          if (target === '#tab-dd-non') updateDrillDownCards('non');
-      });
-  }
-
-  function updateDrillDownCards(type) {
-      if (!CURRENT_DD_DATA) return;
-      
-      var s = CURRENT_DD_DATA.sumAll; // Default
-      if (type === 'moph') s = CURRENT_DD_DATA.sumMoph;
-      if (type === 'non') s = CURRENT_DD_DATA.sumNon;
-
-      var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
-      
-      // Animation Effect เล็กน้อย
-      $('#ddAlloc, #ddSpent, #ddProgress').hide().fadeIn(200);
-
-      $('#ddAlloc').text(fmt(s.allocated));
-      $('#ddSpent').text(fmt(s.spent));
-      var pct = (s.allocated > 0) ? (s.spent / s.allocated * 100) : 0;
-      $('#ddProgress').text(pct.toFixed(2) + '%');
-  }
-
-  // (ฟังก์ชัน renderProjectTable เดิมที่ท่านมีอยู่ ใช้ได้เลยครับ หรือจะก๊อปไปวางทับเพื่อความชัวร์ก็ได้ครับ)
-  function renderProjectTable(projList, tbodyId) {
-      var tbody = $(tbodyId).empty();
-      if (!projList || projList.length === 0) {
-          tbody.append('<tr><td colspan="5" class="text-center py-4 text-muted">ไม่พบโครงการในหมวดนี้</td></tr>');
-          return;
-      }
-      var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
-      projList.forEach(p => {
-          var statusBadge = '';
-          if (p.progress >= 80) statusBadge = '<span class="badge bg-success">ดีเยี่ยม</span>';
-          else if (p.progress >= 50) statusBadge = '<span class="badge bg-warning text-dark">ปานกลาง</span>';
-          else if (p.progress > 0) statusBadge = '<span class="badge bg-danger">ล่าช้า</span>';
-          else statusBadge = '<span class="badge bg-secondary">ยังไม่เริ่ม</span>';
-          
-          var pName = (p.project && p.project !== "undefined") ? p.project : "<span class='text-danger'>ไม่ระบุชื่อโครงการ</span>";
-
-          tbody.append(`<tr>
-              <td class="ps-3"><div class="fw-bold text-dark text-wrap">${pName}</div><div class="small text-muted text-wrap">${p.activity || '-'}</div></td>
-              <td class="text-end">${fmt(p.allocated)}</td>
-              <td class="text-end text-danger">${fmt(p.spent)}</td>
-              <td class="text-center">${statusBadge} <small class="text-muted d-block mt-1">(${p.progress.toFixed(1)}%)</small></td>
-              <td class="text-end pe-3 fw-bold">${fmt(p.balance)}</td>
-          </tr>`);
-      });
-  }
-
-
+  function runSearch() { var dept = $('#searchDeptSelect').val(); var type = $('#searchType').val(); var quarter = $('#searchQuarter').val(); var month = $('#searchMonth').val(); if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().destroy(); } $('#searchTableBody').html('<tr><td colspan="7" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>'); google.script.run.withSuccessHandler(renderSearchPage).searchActionPlan(dept, type, quarter, month); }
+  function resetSearch() { $('#searchDeptSelect').val('').trigger('change'); $('#searchType').val(''); $('#searchQuarter').val(''); $('#searchMonth').val(''); $('#sum-count').text('0'); $('#sum-approved').text('0.00'); $('#sum-allocated').text('0.00'); if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().clear().destroy(); } $('#searchTableBody').empty(); }
+  function renderSearchPage(data) { if(data.error) { $('#searchTableBody').html('<tr><td colspan="7" class="text-danger">'+data.error+'</td></tr>'); return; } var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2}); $('#sum-count').text(Number(data.summary.count).toLocaleString()); $('#sum-approved').text(fmt(data.summary.approved)); $('#sum-allocated').text(fmt(data.summary.allocated)); if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().destroy(); } var tbody = $('#searchTableBody'); tbody.empty(); data.list.forEach(function(row) { var timelineHtml = getTimelineDisplayHtml(row.timeline); tbody.append(`<tr><td class="ps-3">${row.order}</td><td><span class="badge bg-light text-dark border">${row.dept}</span></td><td><div class="fw-bold text-wrap">${row.project}</div><div class="small text-muted">${row.activity}</div></td><td><span class="badge bg-white text-dark border border-secondary text-wrap" style="line-height: 1.4;">${row.budgetType} / ${row.budgetSource}</span></td><td class="text-center text-nowrap">${timelineHtml}</td><td class="text-end text-primary">${fmt(row.approved)}</td><td class="text-end fw-bold text-success">${fmt(row.allocated)}</td></tr>`); }); $('#searchTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] }); }
+  function loadYearlyData() { var dept = $('#yearlyDeptSelect').val(); var type = $('#yearlyType').val(); var quarter = $('#yearlyQuarter').val(); var month = $('#yearlyMonth').val(); if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().destroy(); } $('#yearlyTableBody').html('<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>'); google.script.run.withSuccessHandler(renderYearlyPage).getYearlyPlanData(dept, type, quarter, month); }
+  function resetYearly() { $('#yearlyDeptSelect').val('').trigger('change'); $('#yearlyType').val(''); $('#yearlyQuarter').val(''); $('#yearlyMonth').val(''); $('#yp-count').text('0'); $('#yp-approved').text('0.00'); $('#yp-allocated').text('0.00'); if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().clear().destroy(); } $('#yearlyTableBody').empty(); }
+  function renderYearlyPage(data) { if(data.error) { $('#yearlyTableBody').html('<tr><td colspan="8" class="text-danger">'+data.error+'</td></tr>'); return; } var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2}); $('#yp-count').text(Number(data.summary.projects).toLocaleString()); $('#yp-approved').text(fmt(data.summary.approved)); $('#yp-allocated').text(fmt(data.summary.allocated)); if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().destroy(); } var tbody = $('#yearlyTableBody'); tbody.empty(); data.list.forEach(row => { var timelineHtml = getTimelineDisplayHtml(row.timeline); tbody.append(`<tr><td class="ps-3">${row.order}</td><td><span class="badge bg-light text-dark border">${row.dept}</span></td><td><div class="fw-bold text-wrap" style="font-size: 1rem;">${row.project}</div><div class="small text-muted mt-1"><i class="fas fa-tasks me-1"></i>${row.activity}</div></td><td><span class="badge bg-white text-dark border border-secondary text-wrap" style="line-height: 1.4;">${row.type} / ${row.budgetSource}</span></td><td class="text-center text-nowrap">${timelineHtml}</td><td class="text-end">${fmt(row.allocated)}</td><td class="text-end">${fmt(row.spent)}</td><td class="text-end pe-3 fw-bold ${row.balance < 0 ? 'text-danger':'text-success'}">${fmt(row.balance)}</td></tr>`); }); $('#yearlyTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] }); }
+  function initYearlyPage() { }
 </script>
