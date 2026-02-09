@@ -190,8 +190,8 @@
           
           <div class="d-flex justify-content-between align-items-center mb-4">
               <div>
-                  <h4 class="fw-bold text-dark mb-1"><i class="fas fa-file-invoice-dollar text-success me-2"></i>บันทึกผลการเบิกจ่าย</h4>
-                  <p class="text-muted small mb-0">ประวัติการบันทึกรายการล่าสุด (Real-time)</p>
+                  <h4 class="fw-bold text-dark mb-1"><i class="fas fa-file-invoice-dollar text-success me-2"></i>ประวัติการเบิกจ่ายงบประมาณ</h4>
+                  <p class="text-muted small mb-0">ประวัติการเบิกจ่าย (Budget Disbursement History)</p>
               </div>
               <button class="btn btn-success shadow-sm px-4 py-2 rounded-pill" onclick="openTxModal()">
                   <i class="fas fa-plus-circle me-2"></i>บันทึกรายการใหม่
@@ -205,15 +205,14 @@
                           <thead class="bg-light text-secondary">
                               <tr>
                                   <th class="ps-4 py-3" style="width:10%">ลำดับ</th>
-                                  <th style="width:15%">วันที่/เวลา</th>
+                                  <th style="width:15%">วันที่เบิกจ่าย</th>
                                   <th style="width:30%">โครงการ / กิจกรรม</th>
                                   <th style="width:20%">รายละเอียด / แหล่งงบ</th>
                                   <th class="text-end pe-4" style="width:15%">จำนวนเงิน</th>
                                   <th class="text-center" style="width:10%">จัดการ</th>
                               </tr>
                           </thead>
-                          <tbody id="txHistoryTable">
-                              </tbody>
+                          <tbody id="txHistoryTable"> </tbody>
                       </table>
                   </div>
               </div>
@@ -235,7 +234,7 @@
                                   <div class="card-body p-3">
                                       <div class="row g-3">
                                           <div class="col-md-3">
-                                              <label class="form-label small fw-bold text-muted">ลำดับที่</label>
+                                              <label class="form-label small fw-bold text-muted">ลำดับโครงการ</label>
                                               <select id="txOrder" class="form-select select2" style="width:100%"></select>
                                           </div>
                                           <div class="col-md-9">
@@ -322,10 +321,10 @@
                     <h4 class="fw-bold text-dark mb-1">
                         <i class="fas fa-hand-holding-usd text-primary me-2"></i>บันทึกรายการเงินยืม
                     </h4>
-                    <p class="text-muted small mb-0">ประวัติการยืมเงินรองราชการ (Real-time)</p>
+                    <p class="text-muted small mb-0">ประวัติการยืมเงิน (Loan History)</p>
                 </div>
                 <button class="btn btn-primary shadow-sm px-4 py-2 rounded-pill" onclick="openLoanModal()">
-                    <i class="fas fa-plus-circle me-2"></i>สร้างรายการยืมใหม่
+                    <i class="fas fa-plus-circle me-2"></i>บันทึกรายการเงินยืม
                 </button>
           </div>
 
@@ -334,7 +333,7 @@
                 <div class="card-body bg-light rounded-3 py-3">
                     
                     <div class="row g-2 mb-2">
-                        <div class="col-md-3"> <label class="form-label small fw-bold text-muted mb-1">ลำดับที่</label>
+                        <div class="col-md-3"> <label class="form-label small fw-bold text-muted mb-1">ลำดับโครงการ</label>
                             <select id="searchLoanOrder" class="form-select form-select-sm select2" style="width: 100%;"></select>
                         </div>
                         <div class="col-md-9"> <label class="form-label small fw-bold text-muted mb-1">ชื่อโครงการ</label>
@@ -348,7 +347,7 @@
                             <select id="searchLoanAct" class="form-select form-select-sm select2" style="width: 100%;" disabled></select>
                         </div>
                         <div class="col-md-5">
-                            <label class="form-label small fw-bold text-muted mb-1">กิจกรรมย่อย (ถ้ามี)</label>
+                            <label class="form-label small fw-bold text-muted mb-1">กิจกรรมย่อย(ถ้ามี)</label>
                             <select id="searchLoanSub" class="form-select form-select-sm select2" style="width: 100%;" disabled></select>
                         </div>
                         <div class="col-md-2">
@@ -372,11 +371,11 @@
                         <table class="table table-hover align-middle mb-0" id="tableLoanHistory" style="width:100%">
                             <thead class="bg-primary text-white">
                                 <tr>
-                                    <th class="ps-4 py-3 text-center" style="width:5%">ลำดับ</th>
+                                    <th class="ps-4 py-3 text-center" style="width:5%">ลำดับโครงการ</th>
                                     <th style="width:25%">โครงการ / กิจกรรม</th>
-                                    <th style="width:15%">วันที่ / สถานะ</th>
-                                    <th class="text-end" style="width:10%">จำนวนเงิน</th>
-                                    <th style="width:15%">ประเภทงบ / แหล่งงบ</th>
+                                    <th style="width:15%">วันที่ยืมเงิน / สถานะ</th>
+                                    <th class="text-end" style="width:10%">จำนวนเงินยืม</th>
+                                    <th style="width:15%">ประเภทงบ / แหล่งงบฯ</th>
                                     <th style="width:15%">รายละเอียด</th>
                                     <th class="text-center" style="width:15%">จัดการ</th>
                                 </tr>
