@@ -6,6 +6,7 @@
   var summaryPieChart = null; 
   var summaryBarChart = null; 
   var CURRENT_DD_DATA = null;
+  var LOAN_DATA_CACHE = []; // เก็บข้อมูลทั้งหมดไว้กรองหน้าบ้าน
 
   function switchPage(pageId, element) {
     $('.page-section').addClass('d-none');
@@ -25,15 +26,13 @@
   // 2. INITIALIZATION (SAFETY FIRST METHOD)
   // ==========================================
   $(document).ready(function() {
-    console.log("System Initializing..."); // Debug
+    console.log("System Initializing...");
 
     // A. โหลดข้อมูลตั้งต้น
     refreshMasterData();
     loadDashboardData();
 
     // B. SETUP SELECT2 : GROUP 1 (Transaction Modal)
-    // ------------------------------------------------
-    // ต้องระบุ dropdownParent ให้ Modal ทุกตัว
     $('#txOrder').select2({ 
         theme: 'bootstrap-5', placeholder: '-- เลือกลำดับ --', allowClear: true,
         dropdownParent: $('#txModal') 
@@ -42,7 +41,6 @@
         theme: 'bootstrap-5', placeholder: '-- เลือกกิจกรรม --', allowClear: true,
         dropdownParent: $('#txModal') 
     });
-    // Template พิเศษสำหรับ SubActivity ใน Modal
     var wrapTemplateTx = {
         theme: 'bootstrap-5', placeholder: '-- เลือกกิจกรรมย่อย --', allowClear: true,
         dropdownParent: $('#txModal'),
@@ -50,26 +48,45 @@
     };
     $('#txSubActivity').select2(wrapTemplateTx);
 
-    // C. SETUP SELECT2 : GROUP 2 (Loan Page - Normal)
-    // ------------------------------------------------
-    $('#loanOrder').select2({ theme: 'bootstrap-5', placeholder: '-- เลือกลำดับ --', allowClear: true });
-    $('#loanActivity').select2({ theme: 'bootstrap-5', placeholder: '-- เลือกกิจกรรม --', allowClear: true });
-    
-    var wrapTemplateNormal = {
+    // C. SETUP SELECT2 : GROUP 2 (Loan Modal)
+    $('#loanOrder').select2({ 
+      theme: 'bootstrap-5', placeholder: '-- เลือกลำดับ --', allowClear: true,
+      dropdownParent: $('#loanModal') 
+    });
+    $('#loanActivity').select2({ 
+        theme: 'bootstrap-5', placeholder: '-- เลือกกิจกรรม --', allowClear: true,
+        dropdownParent: $('#loanModal') 
+    });
+    var wrapTemplateLoan = {
         theme: 'bootstrap-5', placeholder: '-- เลือกกิจกรรมย่อย --', allowClear: true,
+        dropdownParent: $('#loanModal'),
         templateResult: formatState, templateSelection: formatState
     };
-    $('#loanSubActivity').select2(wrapTemplateNormal);
+    $('#loanSubActivity').select2(wrapTemplateLoan);
 
     // D. SETUP SELECT2 : GROUP 3 (Search Filters)
     // ------------------------------------------------
-    var searchIds = ['#searchLoanOrder', '#searchTxOrder', '#searchLoanAct', '#searchTxAct', '#searchLoanProj', '#searchTxProj', '#searchDeptSelect', '#yearlyDeptSelect', '#searchLoanSub', '#searchTxSub'];
+    var searchIds = ['#searchTxOrder', '#searchLoanAct', '#searchTxAct', '#searchTxProj', '#searchDeptSelect', '#yearlyDeptSelect', '#searchLoanSub', '#searchTxSub'];
+    
+    // ตั้งค่า Template การแสดงผล (ให้ตัดคำยาวๆ ลงบรรทัดใหม่)
+    var searchTemplate = {
+        theme: 'bootstrap-5', 
+        placeholder: 'เลือกข้อมูล...', 
+        allowClear: true,
+        templateResult: formatState,     // ✅ ใช้ฟังก์ชันตัดคำ
+        templateSelection: formatState   // ✅ ใช้ฟังก์ชันตัดคำตอนเลือกแล้วด้วย
+    };
+    
+    // Apply ให้ตัวทั่วไป
     searchIds.forEach(function(id) {
-        $(id).select2({ theme: 'bootstrap-5', placeholder: 'เลือกข้อมูล...', allowClear: true });
+        $(id).select2(searchTemplate);
     });
 
+    // Apply ให้ตัวค้นหา Loan (Search Filters)
+    $('#searchLoanOrder').select2($.extend({}, searchTemplate, { placeholder: '🔍 ระบุลำดับ...' }));
+    $('#searchLoanProj').select2($.extend({}, searchTemplate, { placeholder: 'พิมพ์ชื่อโครงการเพื่อค้นหา...' }));
+
     // E. EVENT LISTENERS
-    // ------------------------------------------------
     // Transaction Events
     $('#txOrder').on('change select2:select', function (e) { onTxOrderChange(); });
     $('#txOrder').on('select2:clear', function (e) { clearTxForm(); });
@@ -115,13 +132,10 @@
   function populateInitDropdowns() {
       if (!CACHED_OPTIONS) return;
       var orders = [...new Set(CACHED_OPTIONS.map(r => r.order).filter(o => o != "" && o != null))].sort((a,b) => a - b);
-      
-      // Update ALL Order Dropdowns
       ['#txOrder', '#loanOrder', '#searchLoanOrder', '#searchTxOrder'].forEach(sel => {
           var $s = $(sel); $s.empty().append('<option value="">-- เลือกลำดับ --</option>');
           orders.forEach(o => $s.append(`<option value="${o}">${o}</option>`));
       });
-      
       var depts = [...new Set(CACHED_OPTIONS.map(r => r.dept).filter(Boolean))].sort();
       ['#searchDeptSelect', '#yearlyDeptSelect'].forEach(sel => {
           var $s = $(sel); $s.empty().append('<option value="">-- แสดงทั้งหมด --</option>');
@@ -133,7 +147,6 @@
   // 4. DASHBOARD LOGIC
   // ==========================================
   function loadDashboardData() { 
-      // Reset loading state
       $('#moph-approved').html('<i class="fas fa-spinner fa-spin"></i>');
       google.script.run.withSuccessHandler(renderDashboard).getDashboardData(); 
   }
@@ -163,7 +176,6 @@
       var alloc = stats.allocated || 0; var spent = stats.spent || 0; 
       var percent = alloc > 0 ? (spent / alloc) * 100 : 0; 
       $('#' + canvasId + 'Text').text(percent.toFixed(2) + '%'); 
-      
       var ctx = document.getElementById(canvasId);
       if(ctx) {
           var chartStatus = Chart.getChart(canvasId); 
@@ -184,7 +196,6 @@
           if(alloc > 0) chartData.push({ label: dept, y: pct }); 
       } 
       chartData.sort((a, b) => b.y - a.y); 
-      
       var ctx = document.getElementById(canvasId);
       if(ctx) {
           var chartStatus = Chart.getChart(canvasId); 
@@ -198,10 +209,8 @@
   }
 
   // ==========================================
-  // 5. TRANSACTION LOGIC (MODERN MODAL)
+  // 5. TRANSACTION LOGIC
   // ==========================================
-
-  // 1. แก้ไขส่วนแสดงชื่อโครงการ (ใน onTxOrderChange)
   function onTxOrderChange() { 
       var order = $('#txOrder').val(); 
       var select = $('#txActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>'); 
@@ -216,16 +225,9 @@
       
       var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order)); 
       if (rows.length > 0) { 
-          // [UPDATED] ปรับชื่อโครงการ: แสดงเต็ม + ตัวเล็กลง + ปัดบรรทัด
-          $('#tx_disp_proj')
-              .text(rows[0].project)
-              .removeClass('text-truncate') // เอาการตัดคำออก
-              .addClass('text-wrap')        // ให้ปัดบรรทัดอัตโนมัติ
-              .css('font-size', '0.9rem');  // ลดขนาดตัวอักษรลงนิดนึง
-
+          $('#tx_disp_proj').text(rows[0].project).removeClass('text-truncate').addClass('text-wrap').css('font-size', '0.9rem'); 
           $('#tx_disp_dept').text(rows[0].dept); 
           $('#txProjectInfo').removeClass('d-none');
-          
           var activities = [...new Set(rows.map(r => r.activity))].sort(); 
           activities.forEach(act => { select.append(`<option value="${act}">${act}</option>`); }); 
           select.trigger('change').prop('disabled', false); 
@@ -259,28 +261,11 @@
       if (opt.val()) updateTxInfoBox(opt.data('alloc'), opt.data('bal'), opt.data('id')); 
   }
 
-  // 2. แก้ไขสีตัวเลขเงินคงเหลือ (updateTxInfoBox)
   function updateTxInfoBox(alloc, bal, id) { 
       $('#tx_alloc').text(Number(alloc).toLocaleString()); 
-      
-      // คำนวณเปอร์เซ็นต์คงเหลือ
       var pct = (alloc > 0) ? (bal / alloc * 100) : 0;
-      var colorClass = 'text-primary'; // ค่าเริ่มต้น (สีน้ำเงิน >= 50%)
-
-      // [UPDATED] Logic สีตามเงื่อนไข
-      if (pct < 20) {
-          colorClass = 'text-danger';   // น้อยกว่า 20% -> สีแดง
-      } else if (pct < 50) {
-          colorClass = 'text-success';  // 20% ถึง 49.99% -> สีเขียว
-      } 
-      // ตั้งแต่ 50% ขึ้นไป -> สีน้ำเงิน (default)
-
-      // อัปเดตตัวเลขและสี
-      $('#tx_bal')
-          .text(Number(bal).toLocaleString())
-          .removeClass('text-primary text-danger text-success text-warning') // ล้างสีเก่า
-          .addClass(colorClass); // ใส่สีใหม่
-
+      var colorClass = (pct < 20) ? 'text-danger' : (pct < 50 ? 'text-success' : 'text-primary');
+      $('#tx_bal').text(Number(bal).toLocaleString()).removeClass('text-primary text-danger text-success text-warning').addClass(colorClass); 
       $('#txInfoBox').attr('data-id', id).removeClass('d-none'); 
   }
 
@@ -307,62 +292,25 @@
   function renderTxTable(rows) {
       if ($.fn.DataTable.isDataTable('#tableTxHistoryNew')) { $('#tableTxHistoryNew').DataTable().destroy(); }
       var tbody = $('#txHistoryTable'); tbody.empty();
-      
       if (!rows || rows.length === 0) {
           tbody.append('<tr><td colspan="6" class="text-center py-5 text-muted"><i class="fas fa-inbox fa-3x mb-3 opacity-25"></i><br>ยังไม่มีรายการเบิกจ่าย</td></tr>');
           return;
       }
-      
       rows.forEach(r => {
-          var sourceBadge = (r.source && (r.source.includes('Non') || r.source.includes('นอก')))
-              ? '<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 ms-1">Non-MOPH</span>' 
-              : '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1">MOPH</span>';
+          var sourceBadge = (r.source && (r.source.includes('Non') || r.source.includes('นอก'))) ? '<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 ms-1">Non-MOPH</span>' : '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1">MOPH</span>';
           var dateParts = r.date.split(' '); 
           var dateShow = `<div class="fw-bold text-dark">${dateParts[0]}</div><div class="small text-muted">${dateParts[1] || ''}</div>`;
           var amountShow = Number(Math.abs(r.amount)).toLocaleString();
-
-          tbody.append(`
-            <tr>
-                <td class="ps-4 text-center text-muted fw-bold">${r.order}</td>
-                <td>${dateShow}</td>
-                <td>
-                    <div class="fw-bold text-dark text-wrap" style="line-height: 1.4;">${r.project}</div>
-                    <div class="small text-muted text-wrap mt-1">${r.activity}</div>
-                </td>
-                <td>
-                    <div class="text-wrap text-muted small" style="line-height: 1.4;">${r.desc || '-'}</div>
-                    <div class="mt-1"><span class="badge bg-secondary fw-normal">${r.type}</span> ${sourceBadge}</div>
-                </td>
-                <td class="text-end pe-4">
-                    <span class="h6 fw-bold text-primary mb-0">${amountShow}</span>
-                </td>
-                <td class="text-center">
-                    <div class="d-flex justify-content-center gap-1">
-                        <button class="btn btn-sm btn-light text-warning hover-warning" title="แก้ไข" onclick="confirmTxAction('edit', '${r.order}')"><i class="fas fa-pen"></i></button>
-                        <button class="btn btn-sm btn-light text-danger hover-danger" title="ลบรายการ" onclick="confirmTxAction('delete', '${r.order}')"><i class="fas fa-trash-alt"></i></button>
-                    </div>
-                </td>
-            </tr>`);
+          tbody.append(`<tr><td class="ps-4 text-center text-muted fw-bold">${r.order}</td><td>${dateShow}</td><td><div class="fw-bold text-dark text-wrap" style="line-height: 1.4;">${r.project}</div><div class="small text-muted text-wrap mt-1">${r.activity}</div></td><td><div class="text-wrap text-muted small" style="line-height: 1.4;">${r.desc || '-'}</div><div class="mt-1"><span class="badge bg-secondary fw-normal">${r.type}</span> ${sourceBadge}</div></td><td class="text-end pe-4"><span class="h6 fw-bold text-primary mb-0">${amountShow}</span></td><td class="text-center"><div class="d-flex justify-content-center gap-1"><button class="btn btn-sm btn-light text-warning hover-warning" title="แก้ไข" onclick="confirmTxAction('edit', '${r.order}')"><i class="fas fa-pen"></i></button><button class="btn btn-sm btn-light text-danger hover-danger" title="ลบรายการ" onclick="confirmTxAction('delete', '${r.order}')"><i class="fas fa-trash-alt"></i></button></div></td></tr>`);
       });
-
-      $('#tableTxHistoryNew').DataTable({ 
-          "pageLength": 10, "lengthChange": false, "searching": true,
-          "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" }, "emptyTable": "ไม่พบข้อมูล" },
-          "order": [] 
-      });
+      $('#tableTxHistoryNew').DataTable({ "pageLength": 10, "lengthChange": false, "searching": true, "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" }, "emptyTable": "ไม่พบข้อมูล" }, "order": [] });
   }
 
   function confirmTxAction(action, id) {
       if (action === 'delete') {
-          Swal.fire({
-              title: 'ยืนยันการลบ?', text: `ต้องการลบรายการลำดับที่ ${id} ใช่หรือไม่?`, icon: 'warning',
-              showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'ยืนยันลบ', cancelButtonText: 'ยกเลิก'
-          }).then((res) => { if (res.isConfirmed) Swal.fire('แจ้งเตือน', 'ระบบลบข้อมูลจำลองเรียบร้อย', 'success'); });
+          Swal.fire({ title: 'ยืนยันการลบ?', text: `ต้องการลบรายการลำดับที่ ${id} ใช่หรือไม่?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'ยืนยันลบ', cancelButtonText: 'ยกเลิก' }).then((res) => { if (res.isConfirmed) Swal.fire('แจ้งเตือน', 'ระบบลบข้อมูลจำลองเรียบร้อย', 'success'); });
       } else if (action === 'edit') {
-          Swal.fire({
-              title: 'ต้องการแก้ไข?', text: `เปิดหน้าต่างแก้ไขรายการ ${id}`, icon: 'question',
-              showCancelButton: true, confirmButtonColor: '#ffc107', confirmButtonText: 'แก้ไข', cancelButtonText: 'ยกเลิก'
-          }).then((res) => { if (res.isConfirmed) Swal.fire('แจ้งเตือน', 'ระบบเตรียมข้อมูลแก้ไข', 'info'); });
+          Swal.fire({ title: 'ต้องการแก้ไข?', text: `เปิดหน้าต่างแก้ไขรายการ ${id}`, icon: 'question', showCancelButton: true, confirmButtonColor: '#ffc107', confirmButtonText: 'แก้ไข', cancelButtonText: 'ยกเลิก' }).then((res) => { if (res.isConfirmed) Swal.fire('แจ้งเตือน', 'ระบบเตรียมข้อมูลแก้ไข', 'info'); });
       }
   }
 
@@ -390,7 +338,272 @@
   }
 
   // ==========================================
-  // 6. SUMMARY REPORT
+  // 6. LOAN FUNCTIONS (Clean & Complete)
+  // ==========================================
+  function openLoanModal() {
+    $('#loanForm')[0].reset();
+    clearLoanForm();
+    $('#loanOrder').val(null).trigger('change');
+    document.getElementById('loanDate').valueAsDate = new Date();
+    new bootstrap.Modal(document.getElementById('loanModal')).show();
+  }
+
+  function clearLoanForm() {
+    $('#loanActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>').trigger('change').prop('disabled', true);
+    $('#divLoanSubActivity').addClass('d-none');
+    $('#loanInfoBox').addClass('d-none');
+    $('#loanStartDate').val('');
+    $('#loanEndDate').val('');
+  }
+
+  // 🛠️ [แก้ไข] ฟังก์ชัน onLoanOrderChange : แก้ปัญหาเลือกแล้วกิจกรรมไม่ขึ้น
+  function onLoanOrderChange() {
+      var order = $('#loanOrder').val();
+      var select = $('#loanActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>');
+      
+      // Reset ช่องอื่นๆ
+      $('#divLoanSubActivity').addClass('d-none');
+      $('#loanSubActivity').empty();
+      $('#loanInfoBox').addClass('d-none');
+
+      if (!order) {
+          select.trigger('change').prop('disabled', true);
+          return;
+      }
+
+      // กรองข้อมูลจาก CACHED_OPTIONS
+      var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order));
+      
+      if (rows.length > 0) {
+          // 1. แสดง Info Box ทันที
+          updateLoanInfoBox(rows[0]);
+          
+          // 2. ดึงกิจกรรม (Activities) มาใส่ Dropdown
+          var activities = [...new Set(rows.map(r => r.activity).filter(a => a))].sort();
+          activities.forEach(act => { 
+              // ใช้ new Option เพื่อป้องกันปัญหาตัวอักษรพิเศษ
+              select.append(new Option(act, act)); 
+          });
+          
+          // 3. ปลดล็อก Dropdown
+          select.trigger('change').prop('disabled', false);
+      }
+  }
+
+  function onLoanActivityChange() {
+    var order = $('#loanOrder').val();
+    var actName = $('#loanActivity').val();
+    var subSelect = $('#loanSubActivity').empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>');
+    $('#divLoanSubActivity').addClass('d-none');
+    
+    if (!actName) return;
+    
+    var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order) && r.activity === actName);
+    var subActivities = rows.filter(r => r.subActivity).map(r => r.subActivity);
+    
+    if (subActivities.length > 0) {
+        subActivities.forEach(sub => {
+            var row = rows.find(r => r.subActivity === sub);
+            var option = new Option(sub, sub);
+            $(option).data('row', row);
+            subSelect.append(option);
+        });
+        $('#divLoanSubActivity').removeClass('d-none');
+    } else {
+        if(rows[0]) updateLoanInfoBox(rows[0]);
+    }
+  }
+
+  function showLoanBudgetInfoFromSub() {
+    var opt = $('#loanSubActivity option:selected');
+    var rowData = $(opt).data('row');
+    if (rowData) updateLoanInfoBox(rowData);
+  }
+
+  function updateLoanInfoBox(row) {
+    // แสดงผลใน Modal
+    $('#loan_disp_proj').text(row.project);
+    $('#loan_disp_dept').text(row.dept);
+    $('#l_bal').text(Number(row.balance).toLocaleString());
+    $('#l_loaned').text(Number(row.loan).toLocaleString());
+    $('#l_alloc').text(Number(row.allocated).toLocaleString());
+    
+    // เก็บ ID ไว้ใช้ตอน Save
+    $('#loanInfoBox').attr('data-id', row.id).removeClass('d-none');
+  }
+
+  function submitLoan() {
+    var amount = parseFloat($('#loanAmount').val());
+    if (!amount) { Swal.fire('เตือน', 'ระบุจำนวนเงิน', 'warning'); return; }
+    
+    var projectId = $('#loanInfoBox').attr('data-id');
+    if (!projectId) { Swal.fire('Error', 'ไม่พบรหัสโครงการ', 'error'); return; }
+
+    var formData = {
+        projectId: projectId,
+        amount: amount,
+        loanDate: $('#loanDate').val(),
+        startDate: $('#loanStartDate').val(),
+        endDate: $('#loanEndDate').val(),
+        loanType: $('#loanType').val(),
+        desc: $('#loanDesc').val()
+    };
+
+    $('#btnSaveLoan').prop('disabled', true).text('กำลังบันทึก...');
+    
+    google.script.run.withSuccessHandler(function(res) {
+        $('#btnSaveLoan').prop('disabled', false).text('บันทึกรายการ');
+        if (res.status === 'success') {
+            Swal.fire('สำเร็จ', 'บันทึกข้อมูลเรียบร้อย', 'success');
+            var modalEl = document.getElementById('loanModal');
+            var modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+            
+            refreshMasterData();
+            loadLoanHistory();
+        } else {
+            Swal.fire('เกิดข้อผิดพลาด', res.message, 'error');
+        }
+    }).saveLoan(formData);
+  }
+
+  function loadLoanHistory() {
+    // แสดง Loading
+    $('#loanHistoryTable').html('<tr><td colspan="7" class="text-center py-5 text-muted"><i class="fas fa-spinner fa-spin me-2"></i>กำลังโหลดข้อมูล...</td></tr>');
+    
+    // เรียก Server
+    google.script.run.withSuccessHandler(function(rows) {
+        LOAN_DATA_CACHE = rows || []; // 💾 เก็บลง Cache
+        renderLoanTable(LOAN_DATA_CACHE); // แสดงผลทั้งหมดก่อน
+    }).getLoanHistory();
+  }
+
+  // 🛠️ [แก้ไข] ฟังก์ชันแสดงผลตาราง (Sorting + UI ใหม่)
+  function renderLoanTable(rows) {
+    // 1. Reset DataTable เดิม
+    if ($.fn.DataTable.isDataTable('#tableLoanHistory')) { 
+        $('#tableLoanHistory').DataTable().destroy(); 
+    }
+    
+    var tbody = $('#loanHistoryTable');
+    tbody.empty();
+
+    if (!rows || rows.length === 0) {
+        tbody.append('<tr><td colspan="7" class="text-center py-5 text-muted">ไม่พบข้อมูลตามเงื่อนไข</td></tr>');
+        return;
+    }
+
+    // 2. Sorting Logic (เรียงลำดับ)
+    // ล่าสุดขึ้นก่อน -> ถ้าวันเท่ากัน เอาที่ยังไม่คืน (Balance > 0) ขึ้นก่อน
+    rows.sort(function(a, b) {
+        var dateA = new Date(a.date); // แปลงวันที่
+        var dateB = new Date(b.date);
+        if (dateB - dateA !== 0) return dateB - dateA;
+        return b.balance - a.balance; 
+    });
+
+    // 3. Render Rows
+    rows.forEach(r => {
+        // ชื่อโครงการ & กิจกรรม
+        var activityHtml = `<div class="fw-bold text-dark text-wrap" style="min-width: 200px; font-size: 0.95rem;">${r.project}</div>
+                            <div class="small text-muted text-wrap mt-1"><i class="fas fa-tasks me-1 opacity-50"></i>${r.activity}</div>`;
+        if (r.subActivity) activityHtml += `<div class="small text-muted fst-italic ms-3">- ${r.subActivity}</div>`;
+        
+        var amt = Number(r.amount).toLocaleString();
+        
+        // สถานะ Badge
+        var statusBadge = '';
+        if (r.balance <= 0) statusBadge = '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3">คืนครบแล้ว</span>';
+        else if (r.paid > 0) statusBadge = '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-3">คืนบางส่วน</span>';
+        else statusBadge = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3">ยังไม่คืน</span>';
+
+        // ปุ่มจัดการ
+        var btnHtml = '';
+        if (r.balance <= 0) {
+             btnHtml = `<button class="btn btn-sm text-secondary w-100" style="background-color: #f8f9fa; border: 1px dashed #dee2e6;" disabled>
+                            <i class="fas fa-check-circle me-1 text-success"></i>คืนเงินแล้ว
+                        </button>`;
+        } else {
+             btnHtml = `<button class="btn btn-sm btn-outline-primary w-100 shadow-sm hover-scale" onclick="openRepaymentModal('${r.timestamp}', '${r.project}', ${r.amount}, ${r.balance})">
+                        <i class="fas fa-hand-holding-usd me-1"></i>คืนเงิน
+                        </button>`;
+        }
+
+        // รายละเอียดงบประมาณ
+        var budgetInfo = `<span class="badge bg-light text-dark border fw-normal">${r.budgetType || '-'}</span>
+                          <div class="small text-muted mt-1 text-wrap" style="font-size: 0.75rem;">${r.budgetSource || ''}</div>`;
+
+        tbody.append(`
+            <tr>
+                <td class="text-center fw-bold text-secondary">${r.order}</td>
+                <td>${activityHtml}</td>
+                <td>
+                    <div class="fw-bold text-dark text-nowrap">${r.date}</div>
+                    <div class="mt-2">${statusBadge}</div>
+                </td>
+                <td class="text-end pe-4">
+                    <div class="fw-bold text-primary h6 mb-0">${amt}</div>
+                    ${(r.balance > 0 && r.balance < r.amount) ? `<div class="small text-danger mt-1 fw-bold">ค้าง ${Number(r.balance).toLocaleString()}</div>` : ''}
+                </td>
+                <td>${budgetInfo}</td>
+                <td><div class="text-wrap small text-muted" style="max-width: 150px;">${r.desc || '-'}</div></td>
+                <td class="text-center align-middle">${btnHtml}</td>
+            </tr>
+        `);
+    });
+
+    // 4. ✅ Init DataTable (ตามโจทย์: แบ่งหน้า 10, เลือกจำนวนได้)
+    $('#tableLoanHistory').DataTable({
+        "pageLength": 10,       // เริ่มต้น 10 แถว
+        "lengthChange": true,   // ✅ ให้เลือกจำนวนต่อหน้าได้ (Show entries)
+        "searching": false,     // ปิด Search ของ DataTables (เราทำเองแล้ว)
+        "ordering": false,      // ปิด Sort (เรา Sort เองแล้ว)
+        "language": {
+            "paginate": { "next": ">", "previous": "<" },
+            "emptyTable": "ไม่พบข้อมูล",
+            "info": "แสดง _START_ ถึง _END_ จาก _TOTAL_ รายการ",
+            "lengthMenu": "แสดง _MENU_ รายการ"
+        }
+    });
+  }
+
+  function resetLoanSearch() {
+    // 1. ล้างค่าทุกช่อง
+    $('#searchLoanOrder').val(null).trigger('change');
+    // Cascading จะจัดการเคลียร์ตัวลูก (Proj, Act, Sub) ให้เองจากการ trigger change ของตัวแม่
+    // แต่เพื่อความชัวร์ สั่งเคลียร์และปิดการใช้งานตัวลูกด้วย
+    $('#searchLoanProj').val(null).trigger('change').prop('disabled', true);
+    $('#searchLoanAct').val(null).trigger('change').prop('disabled', true);
+    $('#searchLoanSub').val(null).trigger('change').prop('disabled', true);
+
+    // 2. โหลดข้อมูลทั้งหมดจาก Cache มาแสดงใหม่
+    renderLoanTable(LOAN_DATA_CACHE);
+  }
+
+  function runLoanSearch() {
+    // 1. ดึงค่าจากตัวกรอง
+    var sOrder = $('#searchLoanOrder').val();
+    var sProj = $('#searchLoanProj').val();
+    var sAct = $('#searchLoanAct').val();
+    var sSub = $('#searchLoanSub').val();
+
+    // 2. กรองข้อมูลจาก Cache (Client-side Filtering)
+    var filteredRows = LOAN_DATA_CACHE.filter(r => {
+        var match = true;
+        // เทียบค่า (แปลงเป็น String เพื่อความชัวร์)
+        if (sOrder && String(r.order) !== String(sOrder)) match = false;
+        if (sProj && r.project !== sProj) match = false;
+        if (sAct && r.activity !== sAct) match = false;
+        if (sSub && r.subActivity !== sSub) match = false;
+        return match;
+    });
+
+    // 3. แสดงผลเฉพาะที่กรองได้
+    renderLoanTable(filteredRows);
+  }
+
+  // ==========================================
+  // 7. SUMMARY REPORT
   // ==========================================
   function loadSummary() {
       var q = $('#sumQuarter').val(); var m = $('#sumMonth').val();
@@ -401,15 +614,12 @@
   function renderSummaryPage(data) {
       if(data.error) { Swal.fire('Error', data.error, 'error'); return; }
       var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
-      
       $('#s-total-alloc').text(fmt(data.grandTotal.allocated));
       $('#s-total-spent').text(fmt(data.grandTotal.spent));
       $('#s-total-bal').text(fmt(data.grandTotal.allocated - data.grandTotal.spent));
       var pct = (data.grandTotal.allocated > 0) ? (data.grandTotal.spent / data.grandTotal.allocated * 100) : 0;
       $('#s-total-pct').text(pct.toFixed(2) + '%');
-
       renderSummaryCharts(data); 
-
       var tSource = $('#tableSourceBody').empty();
       data.bySource.forEach(s => {
           var bal = s.allocated - s.spent;
@@ -417,7 +627,6 @@
           var badgeColor = (p >= 80) ? 'bg-success' : (p >= 50 ? 'bg-warning text-dark' : 'bg-danger');
           tSource.append(`<tr><td class="ps-4 fw-bold">${s.name}</td><td class="text-center">${s.count}</td><td class="text-end text-primary">${fmt(s.allocated)}</td><td class="text-end text-danger">${fmt(s.spent)}</td><td class="text-center"><span class="badge ${badgeColor}">${p.toFixed(2)}%</span></td><td class="text-end pe-4 fw-bold">${fmt(bal)}</td></tr>`);
       });
-
       var sortProg = (arr) => arr.slice().sort((a, b) => {
           var pA = (a.allocated > 0) ? (a.spent / a.allocated) : 0;
           var pB = (b.allocated > 0) ? (b.spent / b.allocated) : 0;
@@ -432,17 +641,11 @@
       var tbody = $(tbodyId).empty();
       if (!deptList || deptList.length === 0) { tbody.append('<tr><td colspan="6" class="text-center py-3 text-muted">ไม่มีข้อมูล</td></tr>'); return; }
       var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
-      
       deptList.forEach(d => {
           var bal = d.allocated - d.spent;
           var p = (d.allocated > 0) ? (d.spent / d.allocated * 100) : 0;
           var colorClass = (p >= 80) ? 'bg-success' : (p >= 50 ? 'bg-warning' : 'bg-danger');
-          
-          tbody.append(`<tr style="cursor: pointer;" onclick="openDrillDown('${d.name}')" title="คลิกเพื่อดูรายละเอียด">
-              <td class="ps-4 text-nowrap fw-bold text-primary"><i class="fas fa-search me-2 small opacity-50"></i>${d.name}</td>
-              <td class="text-center">${d.count}</td><td class="text-end">${fmt(d.allocated)}</td><td class="text-end">${fmt(d.spent)}</td>
-              <td class="align-middle px-3"><div class="progress" style="height: 20px;"><div class="progress-bar ${colorClass}" role="progressbar" style="width: ${p}%">${p.toFixed(1)}%</div></div></td>
-              <td class="text-end pe-4 fw-bold ${bal < 0 ? 'text-danger' : 'text-success'}">${fmt(bal)}</td></tr>`);
+          tbody.append(`<tr style="cursor: pointer;" onclick="openDrillDown('${d.name}')" title="คลิกเพื่อดูรายละเอียด"><td class="ps-4 text-nowrap fw-bold text-primary"><i class="fas fa-search me-2 small opacity-50"></i>${d.name}</td><td class="text-center">${d.count}</td><td class="text-end">${fmt(d.allocated)}</td><td class="text-end">${fmt(d.spent)}</td><td class="align-middle px-3"><div class="progress" style="height: 20px;"><div class="progress-bar ${colorClass}" role="progressbar" style="width: ${p}%">${p.toFixed(1)}%</div></div></td><td class="text-end pe-4 fw-bold ${bal < 0 ? 'text-danger' : 'text-success'}">${fmt(bal)}</td></tr>`);
       });
   }
 
@@ -454,7 +657,6 @@
           data: { labels: data.bySource.map(s => s.name), datasets: [{ data: data.bySource.map(s => s.allocated), backgroundColor: ['#0d6efd', '#fd7e14', '#20c997', '#ffc107'], borderWidth: 1 }] },
           options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
       });
-
       if (summaryBarChart) summaryBarChart.destroy();
       var top5 = data.byDeptAll.slice(0, 5);
       var ctxBar = document.getElementById('chartTopDept').getContext('2d');
@@ -471,10 +673,8 @@
       $('#ddTitle').text(deptName);
       $('#ddAlloc, #ddSpent, #ddProgress').html('<i class="fas fa-spinner fa-spin text-secondary"></i>');
       $('#ddTableBodyAll, #ddTableBodyMoph, #ddTableBodyNon').html('<tr><td colspan="5" class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-success"></i><div class="mt-2 text-muted">กำลังดึงข้อมูล...</div></td></tr>');
-      
       var triggerEl = document.querySelector('#deptDrillDownModal button[data-bs-target="#tab-dd-all"]');
       if (triggerEl) { var tab = bootstrap.Tab.getInstance(triggerEl); if (tab) tab.show(); else new bootstrap.Tab(triggerEl).show(); }
-
       new bootstrap.Modal(document.getElementById('deptDrillDownModal')).show();
       var q = $('#sumQuarter').val();
       var m = $('#sumMonth').val();
@@ -488,7 +688,6 @@
       renderProjectTable(data.projectsMoph, '#ddTableBodyMoph');
       renderProjectTable(data.projectsNon, '#ddTableBodyNon');
       updateDrillDownCards('all');
-
       $('button[data-bs-toggle="tab"]').off('shown.bs.tab').on('shown.bs.tab', function (e) {
           var t = $(e.target).attr("data-bs-target"); 
           if (t === '#tab-dd-all') updateDrillDownCards('all');
@@ -497,45 +696,17 @@
       });
   }
 
-    // ==========================================
-    // Modal แสดงรายละเอียดกลุ่มงาน
-    // ==========================================
-    function renderProjectTable(projectList, tbodyId) {
-        var tbody = $(tbodyId).empty();
-        
-        if (!projectList || projectList.length === 0) { 
-            tbody.append('<tr><td colspan="5" class="text-center py-3 text-muted">ไม่พบข้อมูล</td></tr>'); 
-            return; 
-        }
-        
-        var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
-
-        projectList.forEach(p => {
-            var pct = p.progress || 0;
-            var colorClass = (pct >= 80) ? 'bg-success' : (pct >= 50 ? 'bg-warning text-dark' : 'bg-danger');
-            
-            // ปรับสีตัวเลขคงเหลือ (ถ้าติดลบให้แดง)
-            var balColor = (p.balance < 0) ? 'text-danger' : 'text-success';
-
-            var html = `
-                <tr>
-                    <td class="ps-3">
-                        <div class="fw-bold text-dark text-wrap" style="font-size: 0.95rem;">${p.project}</div>
-                        <div class="small text-muted mt-1"><i class="fas fa-tasks me-1 opacity-50"></i>${p.activity}</div>
-                    </td>
-                    <td class="text-end fw-bold text-secondary">${fmt(p.allocated)}</td>
-                    <td class="text-end fw-bold text-danger">${fmt(p.spent)}</td>
-                    <td class="align-middle px-2">
-                        <div class="progress" style="height: 18px; background-color: #e9ecef;">
-                            <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${pct}%">${pct.toFixed(1)}%</div>
-                        </div>
-                    </td>
-                    <td class="text-end pe-3 fw-bold ${balColor}">${fmt(p.balance)}</td>
-                </tr>
-            `;
-            tbody.append(html);
-        });
-    }
+  function renderProjectTable(projectList, tbodyId) {
+      var tbody = $(tbodyId).empty();
+      if (!projectList || projectList.length === 0) { tbody.append('<tr><td colspan="5" class="text-center py-3 text-muted">ไม่พบข้อมูล</td></tr>'); return; }
+      var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
+      projectList.forEach(p => {
+          var pct = p.progress || 0;
+          var colorClass = (pct >= 80) ? 'bg-success' : (pct >= 50 ? 'bg-warning text-dark' : 'bg-danger');
+          var balColor = (p.balance < 0) ? 'text-danger' : 'text-success';
+          tbody.append(`<tr><td class="ps-3"><div class="fw-bold text-dark text-wrap" style="font-size: 0.95rem;">${p.project}</div><div class="small text-muted mt-1"><i class="fas fa-tasks me-1 opacity-50"></i>${p.activity}</div></td><td class="text-end fw-bold text-secondary">${fmt(p.allocated)}</td><td class="text-end fw-bold text-danger">${fmt(p.spent)}</td><td class="align-middle px-2"><div class="progress" style="height: 18px; background-color: #e9ecef;"><div class="progress-bar ${colorClass}" role="progressbar" style="width: ${pct}%">${pct.toFixed(1)}%</div></div></td><td class="text-end pe-3 fw-bold ${balColor}">${fmt(p.balance)}</td></tr>`);
+      });
+  }
 
   function updateDrillDownCards(type) {
       if (!CURRENT_DD_DATA) return;
@@ -547,19 +718,6 @@
       $('#ddProgress').text(pct.toFixed(2) + '%');
   }
 
-  // ==========================================
-  // 7. LOAN LOGIC & SEARCH
-  // ==========================================
-  function onLoanOrderChange() { var order = $('#loanOrder').val(); var select = $('#loanActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>'); $('#divLoanSubActivity').addClass('d-none'); $('#loanSubActivity').empty(); $('#loanInfoBox').addClass('d-none'); if(!order) { select.trigger('change').prop('disabled', true); $('#loanProjectInfo').addClass('d-none'); return; } var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order)); if (rows.length > 0) { $('#loan_disp_proj').text(rows[0].project); $('#loan_disp_dept').text(rows[0].dept); $('#loanProjectInfo').removeClass('d-none'); var activities = [...new Set(rows.map(r => r.activity))].sort(); activities.forEach(act => { select.append(`<option value="${act}">${act}</option>`); }); select.trigger('change').prop('disabled', false); } }
-  function onLoanActivityChange() { var order = $('#loanOrder').val(); var actName = $('#loanActivity').val(); var subSelect = $('#loanSubActivity').empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>'); $('#divLoanSubActivity').addClass('d-none'); $('#loanInfoBox').addClass('d-none'); if (!actName) return; var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order) && r.activity === actName); var subActivities = rows.filter(r => r.subActivity && r.subActivity !== "").map(r => r.subActivity); if (subActivities.length > 0) { subActivities.forEach(sub => { var row = rows.find(r => r.subActivity === sub); var option = new Option(sub, sub); $(option).data('row', row); subSelect.append(option); }); $('#divLoanSubActivity').removeClass('d-none'); } else { var row = rows[0]; if (row) updateLoanInfoBox(row); } }
-  function showLoanBudgetInfoFromSub() { var opt = $('#loanSubActivity option:selected'); var rowData = $(opt).data('row'); if (rowData) updateLoanInfoBox(rowData); }
-  function updateLoanInfoBox(row) { $('#l_type').text(row.budgetType); $('#l_source').text(row.budgetSource); $('#l_alloc').text(Number(row.allocated).toLocaleString()); var spent = (row.allocated || 0) - (row.balance || 0); $('#l_spent').text(Number(spent).toLocaleString()); $('#l_loaned').text(Number(row.loan).toLocaleString()); $('#loanInfoBox').attr('data-id', row.id).removeClass('d-none'); }
-  function clearLoanForm() { $('#loanActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>').trigger('change').prop('disabled', true); $('#divLoanSubActivity').addClass('d-none'); $('#loanProjectInfo').addClass('d-none'); $('#loanInfoBox').addClass('d-none'); }
-  function submitLoan() { var amount = parseFloat($('#loanAmount').val()); if(!amount) return; var projectId = $('#loanInfoBox').attr('data-id'); if (!projectId) { Swal.fire('Error', 'ข้อมูลโครงการไม่ครบถ้วน', 'error'); return; } var formData = { projectId: projectId, amount: amount, loanDate: $('#loanDate').val(), loanType: $('#loanType').val(), desc: $('#loanDesc').val() }; $('#btnSaveLoan').prop('disabled', true).text('Saving...'); google.script.run.withSuccessHandler(function(res) { $('#btnSaveLoan').prop('disabled', false).text('บันทึกรายการ'); if (res.status === 'success') { Swal.fire('สำเร็จ', res.message, 'success'); clearLoanForm(); $('#loanOrder').val(null).trigger('change'); $('#loanForm')[0].reset(); refreshMasterData(); loadLoanHistory(); } }).saveLoan(formData); }
-  function resetLoanSearch() { $('#searchLoanOrder').val(null).trigger('change.select2'); $('#searchLoanProj').empty().append('<option value="">-- เลือกโครงการ --</option>').prop('disabled', true); $('#searchLoanAct').empty().append('<option value="">-- ทั้งหมด --</option>').prop('disabled', true); $('#searchLoanSub').empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>').prop('disabled', true); $('#wrapper_searchLoan_sub').addClass('d-none'); loadLoanHistory(); }
-  function runLoanSearch() { google.script.run.withSuccessHandler(renderLoanTable).searchLoanHistory({ order: $('#searchLoanOrder').val(), project: $('#searchLoanProj').val(), activity: $('#searchLoanAct').val(), subActivity: $('#searchLoanSub').val() }); }
-  function loadLoanHistory() { $('#loanHistoryTable').html('<tr><td colspan="5" class="text-center py-3"><i class="fas fa-spinner fa-spin"></i></td></tr>'); google.script.run.withSuccessHandler(renderLoanTable).getLoanHistory(); }
-  function renderLoanTable(rows) { if ($.fn.DataTable.isDataTable('#tableLoanHistory')) { $('#tableLoanHistory').DataTable().destroy(); } var tbody = $('#loanHistoryTable'); tbody.empty(); if (!rows || rows.length === 0) { tbody.append('<tr><td colspan="5" class="text-center py-3">ไม่พบข้อมูล</td></tr>'); return; } rows.forEach(r => { var activityHtml = `<div class="fw-bold text-dark">${r.project}</div><div class="small text-muted">${r.activity}</div>`; if (r.subActivity) { activityHtml += `<div class="small text-muted fst-italic">(${r.subActivity})</div>`; } var amt = Number(r.amount).toLocaleString(); var statusBadge = `<span class="badge bg-danger">ยังไม่ดำเนินการ</span>`; if(r.status === 'คืนบางส่วน') statusBadge = `<span class="badge bg-warning text-dark">คืนบางส่วน</span>`; else if(r.status === 'คืนครบ') statusBadge = `<span class="badge bg-success">คืนครบ</span>`; var actionBtn = ''; if(r.paid > 0) { actionBtn = `<button class="btn btn-sm btn-secondary mt-1 w-100" disabled><i class="fas fa-check-double"></i> บันทึกแล้ว</button>`; } else { actionBtn = `<button class="btn btn-sm btn-outline-success mt-1 w-100" onclick="openRepaymentModal('${r.timestamp}', '${r.project}', ${r.amount}, ${r.balance})"><i class="fas fa-check"></i> คืนเงิน</button>`; } var balDisplay = (r.paid > 0 && r.balance > 0) ? `<div class="small text-danger mt-1">คงเหลือ: ${Number(r.balance).toLocaleString()}</div>` : ''; tbody.append(`<tr><td class="ps-3 text-center">${r.order}</td><td>${activityHtml}</td><td>${r.activity}</td><td class="text-nowrap">${r.date}</td><td class="text-end pe-3"><div class="fw-bold text-primary">${amt}</div><div class="mt-1">${statusBadge}</div>${balDisplay}<div class="mt-2">${actionBtn}</div></td></tr>`); }); $('#tableLoanHistory').DataTable({ "pageLength": 5, "lengthChange": false, "searching": false, "language": { "paginate": { "next": ">", "previous": "<" }, "emptyTable": "ไม่พบข้อมูล" } }); }
   function openRepaymentModal(timestamp, project, loanAmt, balance) { $('#rpTimestamp').val(timestamp); $('#rpProject').text(project); $('#rpLoanAmount').text(Number(loanAmt).toLocaleString()); $('#rpBalance').text(Number(balance).toLocaleString()); $('#rpAmount').val(''); document.getElementById('rpDate').valueAsDate = new Date(); var modal = new bootstrap.Modal(document.getElementById('repaymentModal')); modal.show(); }
   function submitRepayment() { var timestamp = $('#rpTimestamp').val(); var amount = parseFloat($('#rpAmount').val()); var date = $('#rpDate').val(); if (!amount) { Swal.fire('เตือน', 'ระบุยอดเงิน', 'warning'); return; } google.script.run.withSuccessHandler(function(res) { if (res.status === 'success') { Swal.fire('สำเร็จ', res.message, 'success'); $('#repaymentModal').modal('hide'); $('.modal-backdrop').remove(); runLoanSearch(); } }).updateLoanRepayment({ timestamp: timestamp, paidAmount: amount, payDate: date }); }
 
@@ -569,7 +727,6 @@
       var actSel = $('#'+prefix+'Act');
       var subSel = $('#'+prefix+'Sub');
       var divSub = $('#wrapper_'+prefix+'_sub');
-
       if (level === 'order') {
           projSel.empty().append('<option value="">-- เลือกโครงการ --</option>').prop('disabled', true);
           actSel.empty().append('<option value="">-- ทั้งหมด --</option>').prop('disabled', true);
@@ -580,8 +737,7 @@
           var projects = [...new Set(rows.map(r => r.project))].sort();
           projects.forEach(p => projSel.append(new Option(p, p)));
           projSel.prop('disabled', false);
-      }
-      else if (level === 'proj') {
+      } else if (level === 'proj') {
           var proj = projSel.val();
           actSel.empty().append('<option value="">-- ทั้งหมด --</option>').prop('disabled', true);
           subSel.empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>').prop('disabled', true);
@@ -591,8 +747,7 @@
           var activities = [...new Set(rows.map(r => r.activity))].sort();
           activities.forEach(a => actSel.append(new Option(a, a)));
           actSel.prop('disabled', false);
-      }
-      else if (level === 'act') {
+      } else if (level === 'act') {
           var proj = projSel.val(); var act = actSel.val();
           subSel.empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>').prop('disabled', true);
           if(!act) { divSub.addClass('d-none'); return; }
@@ -601,6 +756,7 @@
           if (subActivities.length > 0) { divSub.removeClass('d-none'); subActivities.forEach(s => subSel.append(new Option(s, s))); subSel.prop('disabled', false); } else { divSub.addClass('d-none'); }
       }
   }
+  
   function getTimelineDisplayHtml(timeline) { var months = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.']; var activeCount = timeline.filter(x => x).length; if (activeCount === 0) return '-'; if (activeCount === 12) return '<span class="badge bg-success rounded-pill fw-normal">ทั้งปีงบประมาณ</span>'; var html = '<div class="d-flex flex-wrap gap-1 justify-content-center flex-column align-items-start">'; var quarters = [ { name: 'ไตรมาส 1', indices: [0, 1, 2] }, { name: 'ไตรมาส 2', indices: [3, 4, 5] }, { name: 'ไตรมาส 3', indices: [6, 7, 8] }, { name: 'ไตรมาส 4', indices: [9, 10, 11] } ]; quarters.forEach(function(q) { var activeInQ = q.indices.filter(idx => timeline[idx]); if (activeInQ.length === 3) { html += `<span class="badge bg-primary rounded-pill fw-normal mb-1">${q.name}</span>`; } else if (activeInQ.length > 0) { var monthBadges = activeInQ.map(idx => `<span class="badge bg-success fw-normal">${months[idx]}</span>`).join(' '); html += `<div class="mb-1"><strong class="text-secondary small me-1">${q.name} :</strong>${monthBadges}</div>`; } }); html += '</div>'; return html; }
   function runSearch() { var dept = $('#searchDeptSelect').val(); var type = $('#searchType').val(); var quarter = $('#searchQuarter').val(); var month = $('#searchMonth').val(); if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().destroy(); } $('#searchTableBody').html('<tr><td colspan="7" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>'); google.script.run.withSuccessHandler(renderSearchPage).searchActionPlan(dept, type, quarter, month); }
   function resetSearch() { $('#searchDeptSelect').val('').trigger('change'); $('#searchType').val(''); $('#searchQuarter').val(''); $('#searchMonth').val(''); $('#sum-count').text('0'); $('#sum-approved').text('0.00'); $('#sum-allocated').text('0.00'); if ($.fn.DataTable.isDataTable('#searchTable')) { $('#searchTable').DataTable().clear().destroy(); } $('#searchTableBody').empty(); }
