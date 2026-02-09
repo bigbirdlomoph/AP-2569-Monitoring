@@ -1,6 +1,6 @@
 var SPREADSHEET_ID = '1BhZDqEU7XKhgYgYnBrbFI7IMbr_SLdhU8rvhAMddodQ'; 
 var SHEET_NAME = 'm_actionplan';
-var APP_VERSION = '6900209-1300'; 
+var APP_VERSION = '6900209-1535'; 
 
 function doGet() {
   var template = HtmlService.createTemplateFromFile('index');
@@ -269,43 +269,121 @@ function saveLoan(form) {
   }
 }
 
-function updateLoanRepayment(form) {
+// 📌 [แทนที่] ฟังก์ชันนี้ในไฟล์ Code.gs ครับ
+function updateLoanRepayment(data) {
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(10000);
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    var tSheet = ss.getSheetByName('t_loan');
-    var data = tSheet.getDataRange().getValues();
-    var targetRow = -1;
-    var targetTime = new Date(form.timestamp).getTime();
-
-    for(var i=1; i<data.length; i++) {
-       var rt = new Date(data[i][0]).getTime();
-       if(Math.abs(rt - targetTime) < 1000) { targetRow = i+1; break; }
-    }
-    if (targetRow == -1) return {status:'error', message: 'ไม่พบรายการ'};
-
-    var loanAmt = parseFloat(String(data[targetRow-1][15]).replace(/,/g,'')) || 0;
-    var paidAmt = parseFloat(form.paidAmount) || 0;
-    var bal = loanAmt - paidAmt;
-    var status = (bal <= 0) ? "เบิกจ่ายแล้ว" : "คืนบางส่วน";
     
-    // Duration Logic
-    var duration = "";
-    if (data[targetRow-1][16] && form.payDate) {
-        var d1 = new Date(data[targetRow-1][16]); var d2 = new Date(form.payDate);
-        if(!isNaN(d1) && !isNaN(d2)) duration = Math.ceil((d2-d1)/(1000*60*60*24));
+    // ====================================================
+    // PART 1: อัปเดตสถานะในตาราง "เงินยืม" (t_loan)
+    // ====================================================
+    var tSheet = ss.getSheetByName('t_loan');
+    if (!tSheet) throw new Error("ไม่พบ Sheet: t_loan");
+
+    var tData = tSheet.getDataRange().getValues();
+    var tRowIndex = -1;
+    var projectId = ""; 
+    var loanAmount = 0; 
+
+    var targetDate = new Date(data.timestamp); 
+
+    // วนลูปค้นหา
+    for (var i = 1; i < tData.length; i++) {
+      var cellValue = tData[i][0]; 
+      var isMatch = false;
+
+      if (String(cellValue) == String(data.timestamp)) {
+        isMatch = true;
+      } else {
+        var cellDate = new Date(cellValue);
+        if (!isNaN(cellDate.getTime()) && !isNaN(targetDate.getTime())) {
+          // ยอมรับความคลาดเคลื่อนได้ 60 วินาที
+          if (Math.abs(cellDate.getTime() - targetDate.getTime()) < 60000) { 
+             isMatch = true;
+          }
+        }
+      }
+
+      if (isMatch) {
+        tRowIndex = i + 1;
+        projectId = tData[i][1];     
+        loanAmount = parseFloat(tData[i][15] || 0); 
+        break;
+      }
     }
 
-    // Col 20=Status, 21=Paid, 22=Bal, 23=PayDate, 24=Duration
-    tSheet.getRange(targetRow, 20).setValue(status);
-    tSheet.getRange(targetRow, 21).setValue(paidAmt);
-    tSheet.getRange(targetRow, 22).setValue(bal);
-    tSheet.getRange(targetRow, 23).setValue(form.payDate);
-    tSheet.getRange(targetRow, 24).setValue(duration);
+    if (tRowIndex === -1) throw new Error("ไม่พบรายการกู้ยืม (Timestamp ไม่ตรง)");
 
-    return { status: 'success', message: 'บันทึกคืนเงินเรียบร้อย' };
-  } catch (e) { return { status: 'error', message: e.message }; } finally { lock.releaseLock(); }
+    // คำนวณยอดใน t_loan
+    var currentPaid = parseFloat(tData[tRowIndex-1][20] || 0); 
+    var payAmount = parseFloat(data.paidAmount); 
+    var newPaid = currentPaid + payAmount;
+    var newBalance = loanAmount - newPaid;
+
+    var status = (newBalance <= 0.01) ? "คืนครบ" : "คืนบางส่วน";
+    if (newBalance < 0) newBalance = 0;
+
+    // บันทึกลง t_loan
+    tSheet.getRange(tRowIndex, 20).setValue(status);       
+    tSheet.getRange(tRowIndex, 21).setValue(newPaid);      
+    tSheet.getRange(tRowIndex, 22).setValue(newBalance);   
+    tSheet.getRange(tRowIndex, 23).setValue(data.payDate); 
+
+    // ====================================================
+    // PART 2: ตัดงบประมาณใน "แผนงาน" (m_actionplan)  <-- ✅ แก้ไขจุดนี้
+    // ====================================================
+    if (projectId) {
+      var mSheet = ss.getSheetByName('m_actionplan');
+      if (mSheet) {
+        var mData = mSheet.getDataRange().getValues();
+        var mRowIndex = -1;
+
+        // ค้นหาบรรทัดโครงการ
+        for (var j = 1; j < mData.length; j++) {
+          if (String(mData[j][0]) == String(projectId)) { // Col A: ID
+            mRowIndex = j + 1;
+            break;
+          }
+        }
+
+        if (mRowIndex !== -1) {
+          // 🎯 กำหนดคอลัมน์ใหม่ (ตามที่นายท่านแจ้ง)
+          var colAlloc = 17;   // Col Q = 17 (ยอดจัดสรร)
+          var colSpent = 18;   // Col R = 18 (เบิกจ่ายสะสม)
+          var colBalance = 20; // Col T = 20 (คงเหลือ ไม่รวมเงินยืม)
+          // Col U (21) คงเหลือรวมเงินยืม เราจะไม่ยุ่ง ปล่อยให้สูตรใน Sheet ทำงาน หรือคงเดิมไว้
+
+          // 1. อ่านค่ายอดจัดสรร (Allocated)
+          var cellAlloc = mSheet.getRange(mRowIndex, colAlloc);
+          var allocated = parseFloat(cellAlloc.getValue()) || 0;
+
+          // 2. อ่านค่าเบิกจ่ายเดิม (Current Spent)
+          var cellSpent = mSheet.getRange(mRowIndex, colSpent);
+          var currentSpent = parseFloat(cellSpent.getValue()) || 0;
+
+          // 3. คำนวณใหม่
+          // เบิกจ่ายใหม่ = เบิกจ่ายเดิม + ยอดที่เอามาล้างหนี้ (บิล)
+          var updatedSpent = currentSpent + payAmount; 
+          
+          // คงเหลือใหม่ (Col T) = จัดสรร - เบิกจ่ายใหม่
+          var updatedBalance = allocated - updatedSpent;
+
+          // 4. บันทึกกลับ
+          cellSpent.setValue(updatedSpent);        // ลงช่อง R
+          mSheet.getRange(mRowIndex, colBalance).setValue(updatedBalance); // ลงช่อง T
+        }
+      }
+    }
+
+    return { status: 'success', message: 'บันทึกคืนเงินและตัดงบประมาณเรียบร้อย' };
+
+  } catch (e) {
+    return { status: 'error', message: 'เกิดข้อผิดพลาด: ' + e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // 6. HISTORY GETTERS (Fixed Indices)
