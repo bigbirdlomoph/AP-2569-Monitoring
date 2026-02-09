@@ -567,6 +567,15 @@
     });
   }
 
+  // ✅ ฟังก์ชันใหม่: ดึงข้อมูลล่าสุดจาก Server แล้วแสดงผลตามเงื่อนไขเดิม
+  function refreshLoanTableData() {
+      // เรียกข้อมูลใหม่จาก Google Sheet
+      google.script.run.withSuccessHandler(function(rows) {
+          LOAN_DATA_CACHE = rows || []; // 1. อัปเดตข้อมูลใหม่ลงในตัวแปร Cache
+          runLoanSearch(); // 2. สั่งกรองและแสดงผล (โดยใช้เงื่อนไขที่ user เลือกค้างไว้)
+      }).getLoanHistory();
+  }
+
   function resetLoanSearch() {
     // 1. ล้างค่าทุกช่อง
     $('#searchLoanOrder').val(null).trigger('change');
@@ -719,7 +728,49 @@
   }
 
   function openRepaymentModal(timestamp, project, loanAmt, balance) { $('#rpTimestamp').val(timestamp); $('#rpProject').text(project); $('#rpLoanAmount').text(Number(loanAmt).toLocaleString()); $('#rpBalance').text(Number(balance).toLocaleString()); $('#rpAmount').val(''); document.getElementById('rpDate').valueAsDate = new Date(); var modal = new bootstrap.Modal(document.getElementById('repaymentModal')); modal.show(); }
-  function submitRepayment() { var timestamp = $('#rpTimestamp').val(); var amount = parseFloat($('#rpAmount').val()); var date = $('#rpDate').val(); if (!amount) { Swal.fire('เตือน', 'ระบุยอดเงิน', 'warning'); return; } google.script.run.withSuccessHandler(function(res) { if (res.status === 'success') { Swal.fire('สำเร็จ', res.message, 'success'); $('#repaymentModal').modal('hide'); $('.modal-backdrop').remove(); runLoanSearch(); } }).updateLoanRepayment({ timestamp: timestamp, paidAmount: amount, payDate: date }); }
+  
+  // 📌 [แทนที่] ฟังก์ชันนี้ในไฟล์ js.html ครับ
+  function submitRepayment() { 
+      var timestamp = $('#rpTimestamp').val(); 
+      var amount = parseFloat($('#rpAmount').val()); 
+      var date = $('#rpDate').val(); 
+      
+      if (!amount || amount <= 0) { 
+          Swal.fire('ข้อมูลไม่ถูกต้อง', 'กรุณาระบุยอดเงินที่ต้องการตัดจ่าย', 'warning'); 
+          return; 
+      } 
+      
+      var $btn = $('#repaymentModal .modal-footer .btn-success');
+      var originalText = $btn.html();
+      $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>กำลังบันทึก...');
+
+      google.script.run
+          .withSuccessHandler(function(res) { 
+              $btn.prop('disabled', false).html(originalText);
+              
+              if (res.status === 'success') { 
+                  Swal.fire({
+                      icon: 'success',
+                      title: 'บันทึกสำเร็จ',
+                      text: 'อัปเดตยอดเงินเรียบร้อยแล้ว',
+                      timer: 1500,
+                      showConfirmButton: false
+                  });
+                  $('#repaymentModal').modal('hide'); 
+                  
+                  // ✅✅ [จุดที่แก้ไข] เปลี่ยนมาเรียกฟังก์ชันนี้แทนครับ ✅✅
+                  refreshLoanTableData(); 
+                  
+              } else {
+                  Swal.fire('เกิดข้อผิดพลาด', res.message, 'error');
+              }
+          })
+          .withFailureHandler(function(error) {
+              $btn.prop('disabled', false).html(originalText);
+              Swal.fire('Server Error', error.message, 'error');
+          })
+          .updateLoanRepayment({ timestamp: timestamp, paidAmount: amount, payDate: date }); 
+  }
 
   function onCascadingChange(prefix, level) {
       var order = $('#'+prefix+'Order').val();
