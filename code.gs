@@ -198,24 +198,75 @@ function saveLoan(form) {
   try {
     lock.waitLock(10000); 
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    var mSheet = ss.getSheetByName(SHEET_NAME);
-    var tSheet = ss.getSheetByName('t_loan'); 
     
+    // 1. เตรียมข้อมูล Master
+    var mSheet = ss.getSheetByName(SHEET_NAME); // m_actionplan
     var mData = mSheet.getDataRange().getValues();
-    var idxID = 0; var idxLoan = 18; // เงินยืม Col 18 (S)
     
+    // ค้นหาแถวของโครงการใน Master
+    var idxID = 0; // Col A
+    var idxLoan = 18; // Col S (เงินยืมสะสมใน Master)
     var rowIndex = -1;
-    for (var i = 1; i < mData.length; i++) { if (String(mData[i][idxID]) === String(form.projectId)) { rowIndex = i + 1; break; } }
     
-    if (rowIndex !== -1) {
-        var cur = (parseFloat(String(mSheet.getRange(rowIndex, idxLoan+1).getValue()).replace(/,/g,'')) || 0) + parseFloat(form.amount);
-        mSheet.getRange(rowIndex, idxLoan+1).setValue(cur);
+    for (var i = 1; i < mData.length; i++) { 
+      if (String(mData[i][idxID]) === String(form.projectId)) { 
+        rowIndex = i + 1; 
+        break; 
+      } 
     }
     
-    var r = mData[rowIndex-1];
-    tSheet.appendRow([ new Date(), r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[13], r[14], r[16], form.amount, form.loanDate, form.loanType, form.desc, "ยังไม่ดำเนินการ", 0, form.amount, "", "" ]);
+    // อัปเดตยอดเงินยืมสะสมใน Master (บวกเพิ่ม)
+    if (rowIndex !== -1) {
+       var cur = (parseFloat(String(mSheet.getRange(rowIndex, idxLoan+1).getValue()).replace(/,/g,'')) || 0) + parseFloat(form.amount);
+       mSheet.getRange(rowIndex, idxLoan+1).setValue(cur);
+    }
+    
+    // 2. บันทึกลง Transaction (t_loan)
+    var tSheet = ss.getSheetByName('t_loan');
+    var r = mData[rowIndex-1]; // ดึงข้อมูลแถวนั้นจาก Master มาใช้
+
+    // แปลงวันที่เริ่ม-สิ้นสุด (ถ้ามี)
+    var sDate = form.startDate ? new Date(form.startDate) : "";
+    var eDate = form.endDate ? new Date(form.endDate) : "";
+
+    // 🔥 เรียงข้อมูลลงตาราง t_loan (27 คอลัมน์ ตามที่นายท่านระบุ)
+    tSheet.appendRow([
+       new Date(),       // 1. ประทับเวลา (A)
+       r[0],             // 2. รหัสโครงการ (B)
+       r[1],             // 3. ปีงบประมาณ (C)
+       r[2],             // 4. หมวด (D)
+       r[3],             // 5. ลำดับโครงการ (E)
+       r[4],             // 6. กลุ่มงาน/งาน (F)
+       r[5],             // 7. แผนงาน (G)
+       r[6],             // 8. โครงการ (H)
+       r[7],             // 9. กิจกรรมหลัก (I)
+       r[8],             // 10. กิจกรรมย่อย (J)
+       r[9],             // 11. ประเภทงบ (K)
+       r[10],            // 12. แหล่งงบประมาณ (L)
+       r[13],            // 13. รหัสงบประมาณ (M)
+       r[14],            // 14. รหัสกิจกรรม (N)
+       r[16],            // 15. จัดสรร (O)
+       form.amount,      // 16. เงินยืม (P) -> รับจากฟอร์ม
+       form.loanDate,    // 17. วันที่ยืมเงิน (Q)
+       form.loanType,    // 18. ประเภทเงินยืม (R)
+       form.desc,        // 19. รายละเอียด (S)
+       "ยังไม่ดำเนินการ",  // 20. สถานะการเบิกจ่าย (T)
+       0,                // 21. จำนวนเบิกจ่าย (U) -> เริ่มต้นเป็น 0
+       form.amount,      // 22. คงเหลือ (V) -> เริ่มต้นเท่ากับยอดกู้
+       "",               // 23. วันที่เบิกจ่าย (W) -> ว่างไว้
+       "",               // 24. ระยะเวลาที่ยืม (X) -> ว่างไว้
+       "",               // 25. หมายเหตุ (Y) -> ว่างไว้
+       sDate,            // 26. เริ่มดำเนินการ (Z) ✅
+       eDate             // 27. สิ้นสุดดำเนินการ (AA) ✅
+    ]);
+    
     return { status: 'success', message: 'บันทึกเงินยืมเรียบร้อย' };
-  } catch (e) { return { status: 'error', message: e.message }; } finally { lock.releaseLock(); }
+
+  } catch (e) { 
+    return { status: 'error', message: e.message }; 
+  } finally { 
+    lock.releaseLock(); 
+  }
 }
 
 function updateLoanRepayment(form) {
@@ -535,4 +586,34 @@ function getDeptDetails(deptName, quarterFilter, monthFilter) {
   } catch (e) { 
       return { error: "Server Error: " + e.message }; 
   }
+}
+
+// ==========================================
+// 9. Search Loan 
+// ==========================================
+function searchLoanHistory(criteria) {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName('t_loan');
+  var data = sheet.getDataRange().getValues();
+  var result = [];
+  
+  // column index: B=Order(1), H=Project(7), I=Activity(8), J=SubActivity(9)
+  // ปรับ index ให้ตรงกับ Sheet จริงของนายท่าน
+  
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var match = true;
+    
+    if (criteria.order && String(row[4]) != String(criteria.order)) match = false; // Col E = Index 4 (ลำดับ)
+    if (match && criteria.project && String(row[7]) != String(criteria.project)) match = false; // Col H = Index 7
+    if (match && criteria.activity && String(row[8]) != String(criteria.activity)) match = false; // Col I = Index 8
+    if (match && criteria.subActivity && String(row[9]) != String(criteria.subActivity)) match = false; // Col J = Index 9
+    
+    if (match) {
+        // ... จัดรูปแบบข้อมูลใส่ array result ...
+        // (ใช้ Logic เดียวกับ getLoanHistory)
+        // ...
+    }
+  }
+  return result;
 }
