@@ -15,11 +15,12 @@
     if(element) $(element).addClass('active');
     
     // Trigger Page Logic
-    if (pageId === 'transaction') { loadTxHistory(); }
-    if (pageId === 'loan') { document.getElementById('loanDate').valueAsDate = new Date(); loadLoanHistory(); }
-    if (pageId === 'yearly') initYearlyPage(); 
-    if (pageId === 'summary') { loadSummary(); }
-    if (pageId === 'dashboard') { loadDashboardData(); }
+    if (pageId === 'transaction') { loadTxHistory(); } //หน้าเบิกจ่าย
+    if (pageId === 'loan') { document.getElementById('loanDate').valueAsDate = new Date(); loadLoanHistory(); } //หน้ายืมเงิน
+    if (pageId === 'yearly') initYearlyPage(); //หน้าแผนงานประจำปี
+    if (pageId === 'summary') { loadSummary(); } //Executive Summary
+    if (pageId === 'dashboard') { loadDashboardData(); } //หน้า Dashboard
+    if (pageId === 'allocation') { initAllocPage(); } //หน้าจัดสรรงบประมาณ
   }
 
   // ==========================================
@@ -860,4 +861,334 @@
   function resetYearly() { $('#yearlyDeptSelect').val('').trigger('change'); $('#yearlyType').val(''); $('#yearlyQuarter').val(''); $('#yearlyMonth').val(''); $('#yp-count').text('0'); $('#yp-approved').text('0.00'); $('#yp-allocated').text('0.00'); if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().clear().destroy(); } $('#yearlyTableBody').empty(); }
   function renderYearlyPage(data) { if(data.error) { $('#yearlyTableBody').html('<tr><td colspan="8" class="text-danger">'+data.error+'</td></tr>'); return; } var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2}); $('#yp-count').text(Number(data.summary.projects).toLocaleString()); $('#yp-approved').text(fmt(data.summary.approved)); $('#yp-allocated').text(fmt(data.summary.allocated)); if ($.fn.DataTable.isDataTable('#yearlyTable')) { $('#yearlyTable').DataTable().destroy(); } var tbody = $('#yearlyTableBody'); tbody.empty(); data.list.forEach(row => { var timelineHtml = getTimelineDisplayHtml(row.timeline); tbody.append(`<tr><td class="ps-3">${row.order}</td><td><span class="badge bg-light text-dark border">${row.dept}</span></td><td><div class="fw-bold text-wrap" style="font-size: 1rem;">${row.project}</div><div class="small text-muted mt-1"><i class="fas fa-tasks me-1"></i>${row.activity}</div></td><td><span class="badge bg-white text-dark border border-secondary text-wrap" style="line-height: 1.4;">${row.type} / ${row.budgetSource}</span></td><td class="text-center text-nowrap">${timelineHtml}</td><td class="text-end">${fmt(row.allocated)}</td><td class="text-end">${fmt(row.spent)}</td><td class="text-end pe-3 fw-bold ${row.balance < 0 ? 'text-danger':'text-success'}">${fmt(row.balance)}</td></tr>`); }); $('#yearlyTable').DataTable({ "language": { "search": "ค้นหา:", "paginate": { "next": ">", "previous": "<" } }, "pageLength": 10, "order": [[ 0, "asc" ]] }); }
   function initYearlyPage() { }
+
+  // function จัดสรรงบประมาณ
+    // ==========================================
+    // 8. BUDGET ALLOCATION SYSTEM (FIXED CASCADING & PLAN)
+    // ==========================================
+
+    var ALLOC_HISTORY_CACHE = [];
+    var SELECTED_ALLOC_ROW = null;
+
+    // --- INITIALIZATION ---
+    function initAllocPage() {
+        loadAllocHistory();
+        populateAllocDropdowns();
+    }
+
+    $(document).ready(function() {
+        // 1. Setup Select2 for Search
+        ['#sAllocOrder', '#sAllocProj', '#sAllocAct', '#sAllocSub'].forEach(id => {
+            $(id).select2({ theme: 'bootstrap-5', placeholder: 'เลือกข้อมูล...', allowClear: true, width: '100%' });
+        });
+
+        // 2. Setup Select2 for Form (เพิ่ม #fAllocCat)
+        var formSelects = ['#fAllocOrder', '#fAllocProj', '#fAllocAct', '#fAllocSub'];
+        formSelects.forEach(id => {
+            $(id).select2({ 
+                theme: 'bootstrap-5', placeholder: 'เลือกข้อมูล...', allowClear: true, width: '100%', dropdownParent: $('#allocModal'),
+                templateResult: formatState, templateSelection: formatState
+            });
+        });
+
+        // 3. Bind Events (Search) - ✅ เพิ่ม Logic ครบทุกขั้น
+        $('#sAllocOrder').on('change', function() { cascadeAllocSearch('order'); });
+        $('#sAllocProj').on('change', function() { cascadeAllocSearch('proj'); });
+        $('#sAllocAct').on('change', function() { cascadeAllocSearch('act'); });
+
+        // 4. Bind Events (Form)
+        $('#fAllocOrder').on('change', function() { cascadeAllocForm('order'); });
+        // $('#fAllocDept').on('change', function() { cascadeAllocForm('dept'); });
+        // $('#fAllocCat').on('change', function() { cascadeAllocForm('cat'); }); // เพิ่ม event
+        $('#fAllocPlan').on('change', function() { cascadeAllocForm('plan'); });
+        $('#fAllocProj').on('change', function() { cascadeAllocForm('proj'); });
+        $('#fAllocAct').on('change', function() { cascadeAllocForm('act'); });
+        $('#fAllocSub').on('change', function() { showAllocInfoBox(); });
+    });
+
+    function populateAllocDropdowns() {
+        if(!CACHED_OPTIONS) return;
+        var orders = [...new Set(CACHED_OPTIONS.map(r => r.order).filter(o=>o))].sort((a,b)=>a-b);
+        
+        // เติม Dropdown ตัวแรก (ลำดับ)
+        var $s = $('#sAllocOrder').empty().append('<option value="">-- ทั้งหมด --</option>');
+        var $f = $('#fAllocOrder').empty().append('<option value="">-- เลือกลำดับ --</option>');
+        orders.forEach(o => {
+            $s.append(new Option(o, o));
+            $f.append(new Option(o, o));
+        });
+    }
+
+    // --- LOGIC SEARCH CASCADE (แก้ไขใหม่ให้ครบ) ---
+    function cascadeAllocSearch(level) {
+        var order = $('#sAllocOrder').val();
+        var proj = $('#sAllocProj').val();
+        var act = $('#sAllocAct').val();
+
+        var reset = (ids) => ids.forEach(id => $(id).empty().append('<option value="">-- ทั้งหมด --</option>').prop('disabled', true));
+
+        // กรองข้อมูลตั้งต้นจากลำดับ
+        var rows = CACHED_OPTIONS;
+        if(order) rows = rows.filter(r => String(r.order) === String(order));
+
+        if (level === 'order') {
+            reset(['#sAllocProj', '#sAllocAct', '#sAllocSub']);
+            if (order) {
+                var projs = [...new Set(rows.map(r => r.project))].sort();
+                projs.forEach(p => $('#sAllocProj').append(new Option(p, p)));
+                $('#sAllocProj').prop('disabled', false);
+            }
+        } else if (level === 'proj') {
+            reset(['#sAllocAct', '#sAllocSub']);
+            if (proj) {
+                var subRows = rows.filter(r => r.project === proj);
+                var acts = [...new Set(subRows.map(r => r.activity))].sort();
+                acts.forEach(a => $('#sAllocAct').append(new Option(a, a)));
+                $('#sAllocAct').prop('disabled', false);
+            }
+        } else if (level === 'act') {
+            reset(['#sAllocSub']);
+            if (act) {
+                var subRows = rows.filter(r => r.project === proj && r.activity === act);
+                var subs = [...new Set(subRows.map(r => r.subActivity).filter(s => s))].sort();
+                if (subs.length > 0) {
+                    subs.forEach(s => $('#sAllocSub').append(new Option(s, s)));
+                    $('#sAllocSub').prop('disabled', false);
+                }
+            }
+        }
+    }
+
+    // ---เริ่มต้น LOGIC FORM CASCADE ---
+    function cascadeAllocForm(level) {
+        var order = $('#fAllocOrder').val();
+        var proj = $('#fAllocProj').val();
+        var act = $('#fAllocAct').val();
+
+        var reset = (ids) => ids.forEach(id => $(id).empty().append('<option value="">เลือก...</option>').prop('disabled', true));
+
+        // กรองข้อมูลตามลำดับที่เลือก
+        var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order));
+        
+        // Level 1: Order -> Project (ข้ามทุกอย่าง ยิงตรงไป Project)
+        if(level === 'order') {
+            reset(['#fAllocProj', '#fAllocAct', '#fAllocSub']);
+            if(!order) return;
+            
+            // ดึงโครงการที่มีในลำดับนี้
+            var projs = [...new Set(rows.map(r => r.project))].sort();
+            projs.forEach(p => $('#fAllocProj').append(new Option(p, p)));
+            $('#fAllocProj').prop('disabled', false);
+        }
+
+        // Level 2: Project -> Activity
+        if(level === 'proj') {
+            reset(['#fAllocAct', '#fAllocSub']);
+            if(!proj) return;
+            
+            rows = rows.filter(r => r.project === proj);
+            var acts = [...new Set(rows.map(r => r.activity))].sort();
+            acts.forEach(a => $('#fAllocAct').append(new Option(a, a)));
+            $('#fAllocAct').prop('disabled', false);
+        }
+
+        // Level 3: Activity -> SubActivity
+        if(level === 'act') {
+            reset(['#fAllocSub']);
+            if(!act) return;
+            
+            rows = rows.filter(r => r.project === proj && r.activity === act);
+            var subs = [...new Set(rows.map(r => r.subActivity).filter(s => s))].sort();
+            if(subs.length > 0) {
+                subs.forEach(s => $('#fAllocSub').append(new Option(s, s)));
+                $('#fAllocSub').prop('disabled', false);
+            } else {
+                showAllocInfoBox();
+            }
+        }
+    }
+    // --สิ้นสุด LOGIC FORM CASCADE ---
+
+    // --- OTHER FUNCTIONS (InfoBox & Submit) ---
+    // (ใช้ของเดิมได้เลยครับ หรือจะก๊อปใหม่ก็ได้เพื่อความชัวร์)
+    // 📌 [แทนที่] ฟังก์ชัน showAllocInfoBox ในไฟล์ js.html
+      function showAllocInfoBox() {
+          var order = $('#fAllocOrder').val();
+          var proj = $('#fAllocProj').val();
+          var act = $('#fAllocAct').val();
+          var sub = $('#fAllocSub').val();
+
+          var row = CACHED_OPTIONS.find(r => 
+              String(r.order) === String(order) && 
+              r.project === proj && 
+              r.activity === act && 
+              (sub ? r.subActivity === sub : true)
+          );
+
+          if (row) {
+              SELECTED_ALLOC_ROW = row;
+              $('#allocInfoBox').removeClass('d-none');
+              
+              $('#info_cat').text(row.category || '-');
+              $('#info_source').text((row.budgetType || '-') + ' / ' + (row.budgetSource || '-'));
+              
+              // ✅ [จุดแก้ไข] เปลี่ยนเครื่องหมาย > เป็นสีน้ำเงิน
+              var sep = '<span class="text-primary fw-bold mx-2" style="font-size:1.1em;">></span>';
+              
+              var fullname = `<span class="text-dark">${row.project}</span>` + 
+                            sep + `<span class="text-muted">${row.activity}</span>`;
+                            
+              if(row.subActivity) {
+                  fullname += sep + `<span class="text-muted fst-italic">${row.subActivity}</span>`;
+              }
+              
+              // ⚠️ ต้องใช้ .html() แทน .text() เพื่อให้แสดงสีได้
+              $('#info_fullname').html(fullname); 
+
+              // แสดงตัวเลข
+              $('#info_approve').text(Number(row.approved || 0).toLocaleString());
+              $('#info_allocated').text(Number(row.allocated).toLocaleString());
+              $('#info_spent').text(Number(row.spent).toLocaleString());
+          } else {
+              $('#allocInfoBox').addClass('d-none');
+              SELECTED_ALLOC_ROW = null;
+          }
+      }
+  //สิ้นสุด function จัดสรรงบประมาณ
+
+// ==========================================
+// 📌 ส่วนที่ขาดหายไป: Modal, Save, History Table
+// ==========================================
+
+// 1. เปิด Modal (แก้ปัญหาปุ่มกดไม่ติด)
+function openAllocModal() {
+    // Reset Form
+    $('#fAllocOrder').val(null).trigger('change');
+    $('#fAllocAmount').val('');
+    $('#fAllocLetter').val('');
+    $('#fAllocRemark').val('');
+    
+    // ตั้งวันที่ปัจจุบัน
+    var today = new Date();
+    var yyyy = today.getFullYear();
+    var mm = String(today.getMonth() + 1).padStart(2, '0');
+    var dd = String(today.getDate()).padStart(2, '0');
+    document.getElementById('fAllocDate').value = yyyy + '-' + mm + '-' + dd;
+
+    $('#allocInfoBox').addClass('d-none');
+    
+    new bootstrap.Modal(document.getElementById('allocModal')).show();
+}
+
+// 2. บันทึกข้อมูล (Submit)
+function submitNewAllocation() {
+    // Validate Input
+    if (!SELECTED_ALLOC_ROW) { Swal.fire('ข้อมูลไม่ครบ', 'กรุณาเลือกโครงการ/กิจกรรมให้ถูกต้อง', 'warning'); return; }
+    var amount = parseFloat($('#fAllocAmount').val());
+    var date = $('#fAllocDate').val();
+    
+    if (!amount || isNaN(amount)) { Swal.fire('ข้อมูลไม่ครบ', 'กรุณาระบุจำนวนเงินจัดสรร', 'warning'); return; }
+    if (!date) { Swal.fire('ข้อมูลไม่ครบ', 'กรุณาระบุวันที่จัดสรร', 'warning'); return; }
+
+    // Prepare Data
+    var formData = {
+        id: SELECTED_ALLOC_ROW.id, 
+        currentAlloc: amount,      
+        date: date,                
+        letterNo: $('#fAllocLetter').val(), 
+        remark: $('#fAllocRemark').val(),   
+        fullData: SELECTED_ALLOC_ROW 
+    };
+
+    // UI Loading
+    var $btn = $('#allocModal .modal-footer .btn-warning');
+    var orgHtml = $btn.html();
+    $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>กำลังบันทึก...');
+
+    // Call Server
+    google.script.run.withSuccessHandler(function(res) {
+        $btn.prop('disabled', false).html(orgHtml);
+        if (res.status === 'success') {
+            Swal.fire({
+                icon: 'success',
+                title: 'บันทึกสำเร็จ',
+                text: 'เพิ่มยอดจัดสรรและบันทึกประวัติเรียบร้อยแล้ว',
+                timer: 1500,
+                showConfirmButton: false
+            });
+            $('#allocModal').modal('hide');
+            
+            refreshMasterData(); // โหลด Master ใหม่
+            loadAllocHistory();  // โหลดตารางประวัติใหม่
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }).saveAllocation(formData);
+}
+
+// 3. โหลดประวัติการจัดสรร (แก้ปัญหา Dropdown ไม่ขึ้นเพราะ Error ตรงนี้)
+function loadAllocHistory() {
+    $('#allocHistoryBody').html('<tr><td colspan="7" class="text-center py-4"><i class="fas fa-spinner fa-spin me-2"></i>กำลังโหลดประวัติ...</td></tr>');
+    google.script.run.withSuccessHandler(function(data) {
+        ALLOC_HISTORY_CACHE = data || [];
+        renderAllocHistoryTable(ALLOC_HISTORY_CACHE);
+    }).getAllocationHistory();
+}
+
+// 4. แสดงตารางประวัติ
+function renderAllocHistoryTable(rows) {
+    var tbody = $('#allocHistoryBody').empty();
+    
+    if (!rows || rows.length === 0) {
+        tbody.append('<tr><td colspan="7" class="text-center py-4 text-muted">ไม่พบข้อมูลประวัติการจัดสรร</td></tr>');
+        return;
+    }
+    
+    rows.forEach(r => {
+        var dateShow = r.date; 
+        var desc = `<div class="fw-bold text-dark text-wrap" style="font-size: 0.95rem;">${r.project}</div>`;
+        if(r.activity) desc += `<div class="small text-muted mt-1"><i class="fas fa-angle-right me-1"></i>${r.activity}</div>`;
+        if(r.subActivity) desc += `<div class="small text-muted ms-3 fst-italic">- ${r.subActivity}</div>`;
+
+        // Badge แหล่งงบ
+        var sourceHtml = `<div class="d-flex flex-column gap-1">
+            <span class="badge bg-light text-dark border fw-normal">${r.type || '-'}</span>
+            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 fw-normal text-wrap">${r.source || '-'}</span>
+        </div>`;
+
+        tbody.append(`
+            <tr>
+                <td class="text-center text-primary fw-bold small text-nowrap">${dateShow}</td>
+                <td class="text-center fw-bold text-secondary">${r.order}</td>
+                <td>${desc}</td>
+                <td>${sourceHtml}</td>
+                <td class="text-center small">${r.letterNo || '-'}</td>
+                <td class="text-end fw-bold text-primary">+${Number(r.currentAlloc).toLocaleString()}</td>
+                <td class="text-end fw-bold text-success">${Number(r.accumulatedAlloc).toLocaleString()}</td>
+            </tr>
+        `);
+    });
+}
+
+// 5. ค้นหาประวัติ (ปุ่มค้นหา)
+function runAllocHistorySearch() {
+    var order = $('#sAllocOrder').val();
+    var proj = $('#sAllocProj').val();
+    
+    // Filter จาก CACHE
+    var filtered = ALLOC_HISTORY_CACHE.filter(r => {
+        var match = true;
+        if(order && String(r.order) !== String(order)) match = false;
+        if(proj && r.project !== proj) match = false;
+        return match;
+    });
+    renderAllocHistoryTable(filtered);
+}
+
+// 6. ล้างค่าค้นหา
+function resetAllocSearch() {
+    $('#sAllocOrder').val(null).trigger('change');
+    renderAllocHistoryTable(ALLOC_HISTORY_CACHE);
+}
+
 </script>
