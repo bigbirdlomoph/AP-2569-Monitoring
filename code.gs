@@ -17,21 +17,40 @@ function include(filename) { return HtmlService.createHtmlOutputFromFile(filenam
 function getAllMasterDataForClient() {
   try {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    var sheet = ss.getSheetByName(SHEET_NAME);
+    var sheet = ss.getSheetByName('m_actionplan');
     if (!sheet) return [];
     var data = sheet.getDataRange().getValues();
     if (data.length < 2) return [];
-    data.shift(); // Remove header
+    data.shift(); // ตัดหัวตาราง
 
-    // 🎯 HARDCODE INDEX ตาม LOG ของท่าน (ชัวร์ 100%)
-    // [0]รหัส, [3]ลำดับ, [4]กลุ่มงาน, [6]โครงการ, [7]กิจกรรมหลัก, [8]ย่อย, [9]ประเภทงบ, [10]แหล่ง, [16]จัดสรร, [19]คงเหลือ, [18]เงินยืม
+    // 🎯 MAPPING INDEX (เช็คตามไฟล์จริงของท่าน)
+    // [0]=ID, [2]=หมวด, [3]=ลำดับ, [4]=กลุ่มงาน, [5]=แผนงาน
+    // [6]=โครงการ, [7]=กิจกรรม, [8]=ย่อย
+    // [9]=ประเภท, [10]=แหล่ง
+    // [15]=อนุมัติ (Column P) ✅ เพิ่มตัวนี้
+    // [16]=จัดสรร (Column Q)
+    // [17]=เบิกจ่าย (Column R)
+    // [19]=คงเหลือ (Column T)
+    
     return data.map(function(r) {
       return {
-        id: r[0], order: r[3], dept: r[4], project: r[6], activity: r[7], subActivity: r[8],
-        budgetType: r[9], budgetSource: r[10],
+        id: r[0],
+        category: r[2], 
+        order: r[3],
+        dept: r[4],
+        plan: r[5],
+        project: r[6],
+        activity: r[7],
+        subActivity: r[8],
+        budgetType: r[9],
+        budgetSource: r[10],
+        
+        // ✅ ดึงยอดอนุมัติจาก Column P (Index 15)
+        approved: parseFloat(String(r[15]).replace(/,/g,'')) || 0,
+        
         allocated: parseFloat(String(r[16]).replace(/,/g,'')) || 0,
-        balance: parseFloat(String(r[19]).replace(/,/g,'')) || 0, // คงเหลือ (ไม่รวมเงินยืม)
-        loan: parseFloat(String(r[18]).replace(/,/g,'')) || 0
+        spent: parseFloat(String(r[17]).replace(/,/g,'')) || 0,
+        balance: parseFloat(String(r[19]).replace(/,/g,'')) || 0
       };
     }).filter(function(r) { return r.id && r.project; }); 
   } catch (e) { return []; }
@@ -834,3 +853,129 @@ function searchLoanHistory(criteria) {
 }
 // จบ function Search Loan 
 
+  //เริ่ม function จัดสรรงบประมาณ
+  // ==========================================
+  // 9. NEW ALLOCATION SYSTEM (Backend)
+  // ==========================================
+
+  function saveAllocation(form) {
+    var lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(10000); // ป้องกันการบันทึกชนกัน
+      var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var mSheet = ss.getSheetByName('m_actionplan');
+      var tAllocSheet = ss.getSheetByName('t_allocate');
+      
+      // 1. หาแถวใน Master Plan (m_actionplan)
+      var mData = mSheet.getDataRange().getValues();
+      var rowIndex = -1;
+      for (var i = 1; i < mData.length; i++) {
+        if (String(mData[i][0]) == String(form.id)) { // เทียบ ID
+          rowIndex = i + 1;
+          break;
+        }
+      }
+
+      if (rowIndex === -1) return { status: 'error', message: 'ไม่พบรหัสโครงการในฐานข้อมูล' };
+
+      // 2. คำนวณยอดเงินใหม่ (Accumulate Logic)
+      // Col Q (Index 16+1 = 17) คือ ยอดจัดสรร
+      var cellAlloc = mSheet.getRange(rowIndex, 17);
+      var currentTotal = parseFloat(String(cellAlloc.getValue()).replace(/,/g,'')) || 0;
+      var newTotal = currentTotal + parseFloat(form.currentAlloc);
+
+      // 3. อัปเดต Master Plan
+      cellAlloc.setValue(newTotal);
+
+      // 4. บันทึก Log ลง t_allocate
+      // โครงสร้าง Columns A-S (19 Columns)
+      var r = form.fullData; // ข้อมูลเดิมจาก Client (เพื่อความสะดวกในการ Mapping)
+      
+      // *หมายเหตุ: บาง Field ถ้าไม่มีใน JSON ให้เว้นว่าง หรือดึงจาก mData ก็ได้
+      // เพื่อความแม่นยำ ผมจะดึงจาก mData แถวที่เจอ
+      var mRow = mData[rowIndex-1]; 
+      
+      var logRow = [
+        new Date(),       // A: Timestamp
+        mRow[0],          // B: รหัสโครงการ (ID)
+        mRow[1],          // C: ปีงบ
+        mRow[2],          // D: หมวด
+        mRow[3],          // E: ลำดับ
+        mRow[4],          // F: กลุ่มงาน
+        mRow[5],          // G: แผนงาน
+        mRow[6],          // H: โครงการ
+        mRow[7],          // I: กิจกรรมหลัก
+        mRow[8],          // J: กิจกรรมย่อย
+        mRow[9],          // K: ประเภทงบ
+        mRow[10],         // L: แหล่งงบ
+        mRow[13],         // M: รหัสงบประมาณ
+        mRow[14],         // N: รหัสกิจกรรม
+        newTotal,         // O: จัดสรรสะสม (ยอดใหม่) ✅
+        form.currentAlloc,// P: จัดสรรครั้งนี้ ✅
+        form.date,        // Q: วันที่จัดสรร ✅
+        form.letterNo,    // R: เลขหนังสือ ✅
+        form.remark       // S: หมายเหตุ ✅
+      ];
+
+      tAllocSheet.appendRow(logRow);
+
+      return { status: 'success', message: 'บันทึกเรียบร้อย' };
+
+    } catch (e) {
+      return { status: 'error', message: e.message };
+    } finally {
+      lock.releaseLock();
+    }
+  }
+
+  function getAllocationHistory() {
+    try {
+      var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var sheet = ss.getSheetByName('t_allocate');
+      if (!sheet) return [];
+      
+      // อ่านข้อมูลทั้งหมด (ใช้ getDisplayValues เพื่อความชัวร์เรื่องวันที่)
+      var data = sheet.getDataRange().getDisplayValues();
+      if (data.length < 2) return [];
+
+      var result = [];
+      var parseNum = (v) => parseFloat(String(v).replace(/,/g,'')) || 0;
+      
+      // วนลูปจากล่าสุด (ล่างขึ้นบน)
+      for (var i = data.length - 1; i >= 1; i--) {
+        var row = data[i];
+        if (!row[1]) continue; // ไม่มี ID ข้าม
+
+        // Map Data เพื่อส่งกลับไปแสดงผล
+        result.push({
+          id: row[1],
+          order: row[4],       // E
+          project: row[7],     // H
+          activity: row[8],    // I
+          subActivity: row[9], // J
+          type: row[10],       // K
+          source: row[11],     // L
+          accumulatedAlloc: parseNum(row[14]), // O (สะสม)
+          currentAlloc: parseNum(row[15]),     // P (ครั้งนี้)
+          date: formatDateThai(row[16]),       // Q (วันที่ - แปลงเป็นไทย)
+          letterNo: row[17]    // R
+        });
+        
+        if (result.length >= 100) break; // Limit 100 รายการล่าสุด
+      }
+      return result;
+
+    } catch (e) { return []; }
+  }
+
+  // Helper: แปลงวันที่ไทย (Reused Logic)
+  function formatDateThai(dateStr) {
+    if(!dateStr) return "-";
+    try {
+      var d = new Date(dateStr);
+      if(isNaN(d.getTime())) return dateStr;
+      var months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+      return d.getDate() + " " + months[d.getMonth()] + " " + (d.getFullYear() + 543);
+    } catch(e) { return dateStr; }
+  }
+//สิ้นสุด function จัดสรรงบประมาณ
