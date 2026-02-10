@@ -29,8 +29,25 @@
           <div class="dropdown ms-2">
             <a class="nav-pill-btn dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">ธุรกรรม</a>
             <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
-              <li><a class="dropdown-item" href="javascript:void(0)" onclick="switchPage('transaction')"><i class="fas fa-file-invoice-dollar me-2 text-success"></i>บันทึกรายการเบิกจ่าย</a></li>
-              <li><a class="dropdown-item" href="javascript:void(0)" onclick="switchPage('loan')"><i class="fas fa-hand-holding-usd me-2 text-primary"></i>บันทึกรายการเงินยืม</a></li>
+              
+              <li>
+                  <a class="dropdown-item py-2" href="javascript:void(0)" onclick="switchPage('allocation')">
+                      <i class="fas fa-coins me-2 text-warning"></i>จัดสรรงบประมาณ
+                  </a>
+              </li>
+
+              <li>
+                  <a class="dropdown-item" href="javascript:void(0)" onclick="switchPage('transaction')">
+                    <i class="fas fa-file-invoice-dollar me-2 text-success"></i>บันทึกรายการเบิกจ่าย
+                  </a>
+              </li>
+
+              <li>
+                  <a class="dropdown-item" href="javascript:void(0)" onclick="switchPage('loan')">
+                    <i class="fas fa-hand-holding-usd me-2 text-primary"></i>บันทึกรายการเงินยืม
+                  </a>
+              </li>
+
             </ul>
           </div>
         </div>
@@ -41,16 +58,18 @@
       </div>
     </nav>
 
-    <!-- ชุดเมนู -->
+    <!-- ชุดเมนู Mobile -->
     <div class="collapse navbar-collapse bg-success px-3 pb-3 d-lg-none" id="mobileMenu">
         <a href="javascript:void(0)" class="d-block text-white py-2 text-decoration-none" onclick="switchPage('dashboard')">Dashboard</a>
         <a href="javascript:void(0)" class="d-block text-white py-2 text-decoration-none" onclick="switchPage('search')">สืบค้นแผนปฏิบัติ</a>
         <a href="javascript:void(0)" class="d-block text-white py-2 text-decoration-none" onclick="switchPage('yearly')">แผนงานประจำปี</a>
         <a href="javascript:void(0)" class="d-block text-white py-2 text-decoration-none" onclick="switchPage('summary')">รายงานสรุป</a>
           <hr class="text-white-50">
+        <a href="javascript:void(0)" class="nav-link" onclick="switchPage('allocation')"><i class="fas fa-coins me-2 text-warning"></i>ระบบจัดสรรงบประมาณ</a>
         <a href="javascript:void(0)" class="d-block text-white py-2 text-decoration-none" onclick="switchPage('transaction')">บันทึกเบิกจ่าย</a>
         <a href="javascript:void(0)" class="d-block text-white py-2 text-decoration-none" onclick="switchPage('loan')">บันทึกเงินยืม</a>
     </div>
+    <!-- ชุดเมนู Mobile -->
 
     <div class="container-fluid mt-4 px-lg-5 flex-grow-1" style="padding-bottom: 250px;">
       
@@ -390,6 +409,166 @@
             
           </div>
       </div>
+
+      <!-- หน้าระบบจัดสรรงบประมาณ -->
+      <div id="allocation-page" class="page-section d-none fade-in">
+          <div class="container-fluid py-4">
+              
+              <div class="d-flex justify-content-between align-items-center mb-4">
+                  <div>
+                      <h4 class="fw-bold text-dark mb-1">
+                          <i class="fas fa-coins text-warning me-2"></i>ระบบจัดสรรงบประมาณ
+                      </h4>
+                      <p class="text-muted small mb-0">บันทึกและตรวจสอบประวัติการจัดสรรงบประมาณ</p>
+                  </div>
+                  <div>
+                      <button class="btn btn-warning shadow-sm fw-bold" onclick="openAllocModal()">
+                          <i class="fas fa-plus-circle me-2"></i>บันทึกรายการจัดสรร
+                      </button>
+                  </div>
+              </div>
+
+              <div class="card border-0 shadow-sm mb-4">
+                  <div class="card-header bg-white border-0 py-3">
+                      <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-search me-2"></i>ค้นหาประวัติการจัดสรร</h6>
+                  </div>
+                  <div class="card-body bg-light rounded-bottom-4">
+                      <div class="row g-2">
+                          <div class="col-md-2">
+                              <label class="small text-muted fw-bold">ลำดับโครงการ</label>
+                              <select id="sAllocOrder" class="form-select form-select-sm" style="width:100%"></select>
+                          </div>
+                          <div class="col-md-4">
+                              <label class="small text-muted fw-bold">ชื่อโครงการ</label>
+                              <select id="sAllocProj" class="form-select form-select-sm" style="width:100%" disabled></select>
+                          </div>
+                          <div class="col-md-3">
+                              <label class="small text-muted fw-bold">กิจกรรมหลัก</label>
+                              <select id="sAllocAct" class="form-select form-select-sm" style="width:100%" disabled></select>
+                          </div>
+                          <div class="col-md-3">
+                              <label class="small text-muted fw-bold">กิจกรรมย่อย</label>
+                              <select id="sAllocSub" class="form-select form-select-sm" style="width:100%" disabled></select>
+                          </div>
+                          <div class="col-12 text-end mt-3">
+                              <button class="btn btn-sm btn-light border me-2" onclick="resetAllocSearch()">
+                                  <i class="fas fa-sync-alt me-1"></i>ล้างค่า
+                              </button>
+                              <button class="btn btn-sm btn-primary px-4 shadow-sm" onclick="runAllocHistorySearch()">
+                                  <i class="fas fa-search me-1"></i>ค้นหา
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                  <div class="card-body p-0">
+                      <div class="table-responsive">
+                          <table class="table table-hover align-middle mb-0" id="tableAllocHistory" style="width:100%">
+                              <thead class="bg-warning text-dark">
+                                  <tr>
+                                      <th class="ps-4 py-3 text-nowrap">วันที่จัดสรร</th>
+                                      <th class="text-nowrap">ลำดับ</th>
+                                      <th style="min-width: 250px;">โครงการ / กิจกรรม</th>
+                                      <th style="min-width: 150px;">ประเภท / แหล่งงบ</th>
+                                      <th class="text-nowrap">เลขหนังสือ</th>
+                                      <th class="text-end text-nowrap">จัดสรรครั้งนี้ (P)</th>
+                                      <th class="text-end pe-4 text-nowrap">ยอดรวมล่าสุด (Q)</th>
+                                  </tr>
+                              </thead>
+                              <tbody id="allocHistoryBody"></tbody>
+                          </table>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <div class="modal fade" id="allocModal" tabindex="-1" data-bs-backdrop="static">
+          <div class="modal-dialog modal-lg modal-dialog-centered">
+              <div class="modal-content border-0 shadow-lg rounded-4">
+                  <div class="modal-header bg-warning text-dark px-4">
+                      <h5 class="modal-title fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i>บันทึกการจัดสรรงบ</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+
+                  <div class="modal-body p-4 bg-light">
+
+                      <div class="card border-0 shadow-sm mb-3">
+                          <div class="card-body">
+                              <h6 class="fw-bold text-primary mb-3 border-bottom pb-2">1. เลือกรายการ (Source)</h6>
+                              <div class="row g-3">
+                                  
+                                  <div class="col-md-3">
+                                      <label class="form-label small fw-bold">ลำดับ</label>
+                                      <select id="fAllocOrder" class="form-select form-select-sm" style="width:100%"></select>
+                                  </div>
+                                  <div class="col-md-9">
+                                      <label class="form-label small fw-bold">โครงการ</label>
+                                      <select id="fAllocProj" class="form-select form-select-sm" style="width:100%" disabled></select>
+                                  </div>
+
+                                  <div class="col-md-6">
+                                      <label class="form-label small fw-bold">กิจกรรมหลัก</label>
+                                      <select id="fAllocAct" class="form-select form-select-sm" style="width:100%" disabled></select>
+                                  </div>
+                                  <div class="col-md-6">
+                                      <label class="form-label small fw-bold">กิจกรรมย่อย</label>
+                                      <select id="fAllocSub" class="form-select form-select-sm" style="width:100%" disabled></select>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div id="allocInfoBox" class="card border-primary border-opacity-25 shadow-sm mb-3 d-none">
+                          <div class="card-body bg-primary bg-opacity-10">
+                              <h6 class="fw-bold text-primary mb-2 border-bottom border-primary border-opacity-25 pb-1">ตรวจสอบข้อมูล</h6>
+                              <div class="row small text-dark g-2">
+                                  <div class="col-md-6"><strong>หมวด:</strong> <span id="info_cat">-</span></div>
+                                  <div class="col-md-6"><strong>ประเภท/แหล่ง:</strong> <span id="info_source">-</span></div>
+                                  <div class="col-md-12"><strong>โครงการ:</strong> <div id="info_fullname" class="text-wrap fw-bold">-</div></div>
+                                  <div class="col-md-4"><strong>อนุมัติตามแผน:</strong> <span id="info_approve" class="fw-bold">-</span></div>
+                                  <div class="col-md-4"><strong>จัดสรรแล้ว (เดิม):</strong> <span id="info_allocated" class="fw-bold text-success">-</span></div>
+                                  <div class="col-md-4"><strong>เบิกจ่ายแล้ว:</strong> <span id="info_spent" class="fw-bold text-danger">-</span></div>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div class="card border-0 shadow-sm">
+                          <div class="card-body">
+                              <h6 class="fw-bold text-success mb-3 border-bottom pb-2">2. ระบุยอดจัดสรร (Input)</h6>
+                              <div class="row g-3">
+                                  <div class="col-md-4">
+                                      <label class="form-label small fw-bold">วันที่จัดสรร</label>
+                                      <input type="date" class="form-control" id="fAllocDate">
+                                  </div>
+                                  <div class="col-md-4">
+                                      <label class="form-label small fw-bold">เลขหนังสือ</label>
+                                      <input type="text" class="form-control" id="fAllocLetter" placeholder="ระบุเลขที่...">
+                                  </div>
+                                  <div class="col-md-4">
+                                      <label class="form-label small fw-bold text-success">จำนวนเงิน</label>
+                                      <input type="number" class="form-control fw-bold text-success border-success" id="fAllocAmount" placeholder="0.00" step="0.01">
+                                  </div>
+                                  <div class="col-12">
+                                      <label class="form-label small fw-bold">หมายเหตุ</label>
+                                      <input type="text" class="form-control" id="fAllocRemark" placeholder="ระบุหมายเหตุ (ถ้ามี)">
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  <div class="modal-footer bg-light px-4 py-3">
+                      <button type="button" class="btn btn-light border" data-bs-dismiss="modal">ยกเลิก</button>
+                      <button type="button" class="btn btn-warning fw-bold px-4 shadow-sm" onclick="submitNewAllocation()">
+                          <i class="fas fa-save me-2"></i>บันทึกรายการ
+                      </button>
+                  </div>
+              </div>
+          </div>
+      </div>
+      <!-- หน้าระบบจัดสรรงบประมาณ -->
 
       <?!= include('summary'); ?>
 
