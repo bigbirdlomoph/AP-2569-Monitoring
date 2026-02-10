@@ -1,6 +1,6 @@
 var SPREADSHEET_ID = '1BhZDqEU7XKhgYgYnBrbFI7IMbr_SLdhU8rvhAMddodQ'; 
 var SHEET_NAME = 'm_actionplan';
-var APP_VERSION = '6900209-1535'; 
+var APP_VERSION = '6900210-1330'; 
 
 function doGet() {
   var template = HtmlService.createTemplateFromFile('index');
@@ -388,48 +388,168 @@ function updateLoanRepayment(data) {
 
 // 6. HISTORY GETTERS (Fixed Indices)
 function getTransactionHistory() { return getHistory('t_actionplan'); }
-function getLoanHistory() { return getHistory('t_loan'); }
 
+  // function getLoanHistory() { 
+  //   return getHistory('t_loan'); 
+  //   }
+  // 📌 [แทนที่] ฟังก์ชัน getLoanHistory ในไฟล์ Code.gs (เพิ่มวันที่ไทย)
+function getLoanHistory() {
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var tSheet = ss.getSheetByName('t_loan');
+    if (!tSheet) return [];
+
+    // 1. เตรียมข้อมูล Master (VLOOKUP)
+    var projectMap = {};
+    try {
+      var mSheet = ss.getSheetByName('m_actionplan');
+      if (mSheet) {
+        var mData = mSheet.getDataRange().getDisplayValues();
+        for (var i = 1; i < mData.length; i++) {
+          var pid = String(mData[i][0]).trim();
+          if (pid) {
+            projectMap[pid] = { type: mData[i][9] || "-", source: mData[i][10] || "-" };
+          }
+        }
+      }
+    } catch (e) { console.log("Map Error: " + e); }
+
+    // 2. ดึงข้อมูล Transaction
+    var tData = tSheet.getDataRange().getDisplayValues(); 
+    var result = [];
+    var parseNum = function(val) { return parseFloat(String(val).replace(/,/g, '')) || 0; };
+    
+    // 🗓️ ฟังก์ชันแปลงวันที่ไทย (เช่น 2026-02-09 -> 9 ก.พ. 2569)
+    var toThaiDate = function(val) {
+      if (!val) return "-";
+      try {
+        var d;
+        // กรณี 1: เป็น Date Object
+        if (Object.prototype.toString.call(val) === '[object Date]') d = val;
+        // กรณี 2: เป็น String YYYY-MM-DD
+        else if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          var parts = val.split('-'); d = new Date(parts[0], parts[1]-1, parts[2]);
+        }
+        // กรณี 3: String อื่นๆ พยายามแปลง
+        else { d = new Date(val); }
+
+        if (isNaN(d.getTime())) return String(val); // แปลงไม่ได้ส่งค่าเดิม
+
+        var months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+        return d.getDate() + " " + months[d.getMonth()] + " " + (d.getFullYear() + 543);
+      } catch (ex) { return String(val); }
+    };
+
+    for (var i = tData.length - 1; i >= 1; i--) {
+      try {
+        var row = tData[i];
+        if (!row[0] && !row[1]) continue;
+
+        var pid = String(row[1] || "").trim();
+        var meta = projectMap[pid] || { type: '-', source: '-' };
+
+        result.push({
+          id: row[0], timestamp: row[0],
+          project: row[7], activity: row[8], subActivity: row[9],
+          amount: parseNum(row[15]),
+          date: toThaiDate(row[16]), // ✅ แปลงเป็นวันที่ไทยตรงนี้เลย
+          status: row[19],
+          paid: parseNum(row[20]),
+          balance: parseNum(row[21]),
+          order: row[4],
+          type: row[17],
+          desc: row[18],
+          budgetType: meta.type,     
+          budgetSource: meta.source, 
+          dept: row[2]
+        });
+
+      } catch (e) { console.log("Row Error ("+i+"): " + e); }
+    }
+    return result;
+  }
+// จบ function ประวัติการยืมเงิน
+
+//function ดึงรายการเบิกจ่าย
 function getHistory(sheetName) {
   try {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     var tSheet = ss.getSheetByName(sheetName);
     if (!tSheet) return [];
-    var data = tSheet.getDataRange().getValues();
+    
+    // ใช้ getDisplayValues เพื่อความชัวร์ (เหมือนตารางเงินยืม)
+    var data = tSheet.getDataRange().getDisplayValues();
     if (data.length < 2) return [];
+    
     var result = [];
-    var parseAmount = (v) => parseFloat(String(v).replace(/,/g, '')) || 0;
+    var parseAmount = function(v) { return parseFloat(String(v).replace(/,/g, '')) || 0; };
 
+    // 🗓️ ฟังก์ชันแปลงวันที่ไทย (Reusable)
+    var toThaiDate = function(val) {
+      if (!val) return "-";
+      try {
+        var d;
+        // กรณี 1: เป็น Date Object
+        if (Object.prototype.toString.call(val) === '[object Date]') d = val;
+        // กรณี 2: เป็น String YYYY-MM-DD
+        else if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}$/)) {
+           var parts = val.split('-'); d = new Date(parts[0], parts[1]-1, parts[2]);
+        }
+        // กรณี 3: String อื่นๆ (เช่น จาก getDisplayValues)
+        else { d = new Date(val); }
+
+        if (isNaN(d.getTime())) return String(val); // ถ้าแปลงไม่ได้ ส่งค่าเดิม
+
+        var months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+        return d.getDate() + " " + months[d.getMonth()] + " " + (d.getFullYear() + 543);
+      } catch (ex) { return String(val); }
+    };
+
+    // เริ่มวนลูปจากล่าสุด (ล่างขึ้นบน)
     for (var i = data.length - 1; i >= 1; i--) { 
       var row = data[i];
-      if (!row || !row[0]) continue;
+      if (!row || (!row[0] && !row[1])) continue;
       
       var item = {};
+      
       if(sheetName === 't_actionplan') {
+          // 📝 โหมดประวัติการเบิกจ่าย
           // [4]Order, [7]Proj, [8]Act, [9]Sub, [15]Amt, [17]Date, [18]Type, [11]Source, [19]Desc, [1]ID
           item = {
              rowId: i+1,
-             order: row[4], project: row[7], activity: row[8], subActivity: row[9],
+             order: row[4], 
+             project: row[7], 
+             activity: row[8], 
+             subActivity: row[9],
              amount: parseAmount(row[15]),
-             date: (row[17] instanceof Date) ? Utilities.formatDate(row[17], "Asia/Bangkok", "dd/MM/yyyy") : row[17],
-             type: row[18], source: row[11], desc: row[19], id: row[1]
+             date: toThaiDate(row[17]), // ✅ แปลงวันที่เป็นไทย (เช่น 1 ต.ค. 2569)
+             type: row[18], 
+             source: row[11], 
+             desc: row[19], 
+             id: row[1]
           };
-      } else { // t_loan
-          // [4]Order, [7]Proj, [15]Amt, [16]LoanDate, [19]Status, [20]Paid, [21]Bal
+      } 
+      else { 
+          // 📝 โหมดอื่นๆ (เผื่อไว้)
           item = {
-             timestamp: (row[0] instanceof Date) ? row[0].toISOString() : "",
-             order: row[4], project: row[7], activity: row[8], subActivity: row[9],
+             timestamp: row[0],
+             order: row[4], project: row[7],
              amount: parseAmount(row[15]),
-             date: (row[16] instanceof Date) ? Utilities.formatDate(row[16], "Asia/Bangkok", "dd/MM/yyyy") : row[16],
-             status: row[19], paid: parseAmount(row[20]), balance: parseAmount(row[21])
+             date: toThaiDate(row[16]),
+             status: row[19]
           };
       }
+
       if(item.amount > 0 || item.order) result.push(item);
-      if (result.length >= 20) break;
+      if (result.length >= 50) break; // Limit 50 รายการล่าสุด
     }
     return result;
-  } catch(e) { return []; }
+  } catch(e) { 
+    console.log("getHistory Error: " + e);
+    return []; 
+  }
 }
+//จบ function ดึงรายการเบิกจ่าย
+
 
 // ==========================================
 // 7. SUMMARY REPORT (HARDCODED INDEX VERSION) 📊
@@ -671,27 +791,46 @@ function getDeptDetails(deptName, quarterFilter, monthFilter) {
 // ==========================================
 function searchLoanHistory(criteria) {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  var sheet = ss.getSheetByName('t_loan');
-  var data = sheet.getDataRange().getValues();
+  var tSheet = ss.getSheetByName('t_loan');
+  var mSheet = ss.getSheetByName('m_actionplan');
+
+  var projectMap = {};
+  if (mSheet) {
+    var mData = mSheet.getDataRange().getDisplayValues();
+    for (var i = 1; i < mData.length; i++) {
+      var pid = String(mData[i][0]).trim();
+      projectMap[pid] = { type: mData[i][9], source: mData[i][10] };
+    }
+  }
+
+  // ใช้ getDisplayValues เหมือนกัน
+  var data = tSheet.getDataRange().getDisplayValues();
   var result = [];
-  
-  // column index: B=Order(1), H=Project(7), I=Activity(8), J=SubActivity(9)
-  // ปรับ index ให้ตรงกับ Sheet จริงของนายท่าน
-  
+  var parseNum = function(v) { return parseFloat(String(v).replace(/,/g, '')) || 0; };
+
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
     var match = true;
     
-    if (criteria.order && String(row[4]) != String(criteria.order)) match = false; // Col E = Index 4 (ลำดับ)
-    if (match && criteria.project && String(row[7]) != String(criteria.project)) match = false; // Col H = Index 7
-    if (match && criteria.activity && String(row[8]) != String(criteria.activity)) match = false; // Col I = Index 8
-    if (match && criteria.subActivity && String(row[9]) != String(criteria.subActivity)) match = false; // Col J = Index 9
-    
+    // Logic กรองข้อมูล
+    if (criteria.order && String(row[4]) != String(criteria.order)) match = false;
+    if (match && criteria.project && String(row[7]).indexOf(criteria.project) === -1) match = false; // ใช้ indexOf เพื่อให้ค้นหาบางส่วนได้
+
     if (match) {
-        // ... จัดรูปแบบข้อมูลใส่ array result ...
-        // (ใช้ Logic เดียวกับ getLoanHistory)
-        // ...
+        var pid = String(row[1]).trim();
+        var meta = projectMap[pid] || { type: '-', source: '-' };
+        
+        result.push({
+          id: row[0], timestamp: row[0], project: row[7], activity: row[8], subActivity: row[9],
+          amount: parseNum(row[15]),
+          date: row[16], // ✅ Col Q
+          status: row[19], paid: parseNum(row[20]), balance: parseNum(row[21]), order: row[4],
+          type: row[17], desc: row[18], // ✅ Col R, S
+          budgetType: meta.type, budgetSource: meta.source, dept: row[2]
+        });
     }
   }
   return result;
 }
+// จบ function Search Loan 
+
