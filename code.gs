@@ -1,6 +1,6 @@
 var SPREADSHEET_ID = '1BhZDqEU7XKhgYgYnBrbFI7IMbr_SLdhU8rvhAMddodQ'; 
 var SHEET_NAME = 'm_actionplan';
-var APP_VERSION = '6900210-1630'; 
+var APP_VERSION = '6900211-1330'; 
 
 function doGet() {
   var template = HtmlService.createTemplateFromFile('index');
@@ -73,8 +73,17 @@ function getDashboardData() {
 
     data.forEach(function(row) {
       var typeVal = String(row[I_TYPE] || "").trim();
-      var isMoph = (typeVal.includes('งบประมาณ') || typeVal.includes('สป.สธ') || typeVal === 'PP' || typeVal === 'OP' || typeVal.includes('งบดำเนินงาน')); 
-      var target = isMoph ? summary.moph : summary.nonMoph;
+      
+      // 🔥 [UPDATED LOGIC] เช็ค 'เงินนอก' ก่อนเสมอ (กันพลาดคำว่า 'สป.')
+      var isNonMoph = (
+          typeVal.indexOf('เงินนอก') > -1 || 
+          typeVal.indexOf('เงินบำรุง') > -1 || 
+          typeVal.indexOf('บริจาค') > -1 || 
+          typeVal.toUpperCase().indexOf('NON') > -1
+      );
+      
+      // ถ้าไม่ใช่เงินนอก ให้ถือเป็น MOPH
+      var target = isNonMoph ? summary.nonMoph : summary.moph;
       
       target.approved += parseNum(row[I_APPROVE]);
       target.allocated += parseNum(row[I_ALLOC]);
@@ -104,26 +113,32 @@ function getYearlyPlanData(deptFilter, typeFilter, quarterFilter, monthFilter) {
     if (!sheet) return { summary: { projects: 0 }, list: [] };
     var data = sheet.getDataRange().getValues();
     data.shift();
-
-    // 🎯 HARDCODE INDEX
+    
     var I_ORDER=3, I_DEPT=4, I_PROJ=6, I_ACT=7, I_SUB=8, I_TYPE=9, I_SOURCE=10, I_ALLOC=16, I_SPENT=17;
-    // Index เดือน ต.ค.(26) - ก.ย.(37)
     var I_MONTHS = [26,27,28,29,30,31,32,33,34,35,36,37];
     var quarters = { 'Q1': [0,1,2], 'Q2': [3,4,5], 'Q3': [6,7,8], 'Q4': [9,10,11] };
-    
     var summary = { projects: 0, approved: 0, allocated: 0, spent: 0 };
     var list = [];
     var parseNum = (val) => { var v = parseFloat(String(val).replace(/,/g,'')); return isNaN(v) ? 0 : v; };
-
+    
     data.forEach(row => {
       var rowDept = String(row[I_DEPT]).trim();
       var passDept = (deptFilter === "" || deptFilter === null || rowDept === deptFilter);
 
       var typeVal = String(row[I_TYPE] || "").trim();
-      var isMoph = (typeVal.includes('งบประมาณ') || typeVal.includes('สป.สธ') || typeVal === 'PP' || typeVal === 'OP' || typeVal.includes('งบดำเนินงาน')); 
+      
+      // 🔥 [UPDATED LOGIC] เช็ค 'เงินนอก' ก่อนเสมอ
+      var isNonMoph = (
+          typeVal.indexOf('เงินนอก') > -1 || 
+          typeVal.indexOf('เงินบำรุง') > -1 || 
+          typeVal.indexOf('บริจาค') > -1 || 
+          typeVal.toUpperCase().indexOf('NON') > -1
+      );
+      var isMoph = !isNonMoph;
+
       var passType = true;
       if (typeFilter === 'MOPH') passType = isMoph;
-      else if (typeFilter === 'NONMOPH') passType = !isMoph;
+      else if (typeFilter === 'NONMOPH') passType = isNonMoph;
 
       var timeline = I_MONTHS.map(idx => (String(row[idx]).trim() !== '') ? 1 : 0);
       var passTime = true;
@@ -137,12 +152,10 @@ function getYearlyPlanData(deptFilter, typeFilter, quarterFilter, monthFilter) {
       if (passDept && passType && passTime) {
         var actName = String(row[I_ACT]);
         if (row[I_SUB]) actName += " (" + row[I_SUB] + ")";
-        
         var alloc = parseNum(row[I_ALLOC]);
         var spent = parseNum(row[I_SPENT]);
         
         summary.projects++; summary.allocated += alloc; summary.spent += spent;
-        
         list.push({ 
             order: row[I_ORDER], dept: rowDept, project: row[I_PROJ], activity: actName, 
             type: row[I_TYPE], budgetSource: row[I_SOURCE], 
@@ -573,6 +586,7 @@ function getHistory(sheetName) {
 // ==========================================
 // 7. SUMMARY REPORT (HARDCODED INDEX VERSION) 📊
 // ==========================================
+// 📌 [แทนที่] ฟังก์ชัน getSummaryData ในไฟล์ Code.gs
 function getSummaryData(quarterFilter, monthFilter) {
   try {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -580,112 +594,64 @@ function getSummaryData(quarterFilter, monthFilter) {
     if (!sheet) return { error: "ไม่พบ Sheet ข้อมูล" };
     
     var data = sheet.getDataRange().getValues();
-    // ไม่ต้อง data.shift() ก็ได้ เดี๋ยวเราเริ่ม loop ที่แถว 1
 
-    // 🎯 HARDCODE INDEX (ตาม Log ที่ท่านส่งมา)
-    var I_DEPT = 4;      // กลุ่มงาน [4]
-    var I_TYPE = 9;      // ประเภทงบ [9]
-    var I_SOURCE = 10;   // แหล่งงบ [10]
-    var I_ALLOC = 16;    // จัดสรร [16]
-    var I_SPENT = 17;    // เบิกจ่าย [17]
-    
-    // Index เดือน ต.ค.(26) - ก.ย.(37)
+    var I_DEPT = 4; var I_TYPE = 9; var I_SOURCE = 10; var I_ALLOC = 16; var I_SPENT = 17;
     var I_MONTHS = [26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37];
     var quarters = { 'Q1': [0, 1, 2], 'Q2': [3, 4, 5], 'Q3': [6, 7, 8], 'Q4': [9, 10, 11] };
-    
-    var parseNum = function(val) { 
-        var v = parseFloat(String(val).replace(/,/g, '')); 
-        return isNaN(v) ? 0 : v; 
-    };
+    var parseNum = function(val) { var v = parseFloat(String(val).replace(/,/g, '')); return isNaN(v) ? 0 : v; };
 
-    // เตรียมตัวแปรเก็บผลรวม
     var grandTotal = { allocated: 0, spent: 0, count: 0 };
-    var bySource = {}; 
-    var byDeptAll = {}, byDeptMoph = {}, byDeptNon = {};
+    var bySource = {}; var byDeptAll = {}, byDeptMoph = {}, byDeptNon = {};
 
-    // เริ่มวนลูป (ข้ามหัวตารางแถว 0)
     for (var i = 1; i < data.length; i++) {
         var row = data[i];
-        
-        // --- 1. เช็ค Timeline (ตัวกรองเวลา) ---
-        var timeline = I_MONTHS.map(function(idx) { 
-            return (String(row[idx] || "").trim() !== '') ? 1 : 0; 
-        });
-
+        var timeline = I_MONTHS.map(function(idx) { return (String(row[idx] || "").trim() !== '') ? 1 : 0; });
         var passTime = true;
-        if (quarterFilter && quarters[quarterFilter]) { 
-            if (!quarters[quarterFilter].some(function(mIdx) { return timeline[mIdx] === 1; })) passTime = false; 
-        }
-        if (monthFilter && String(monthFilter) !== "") { 
-            if (timeline[parseInt(monthFilter)] !== 1) passTime = false; 
-        }
+        if (quarterFilter && quarters[quarterFilter]) { if (!quarters[quarterFilter].some(function(mIdx) { return timeline[mIdx] === 1; })) passTime = false; }
+        if (monthFilter && String(monthFilter) !== "") { if (timeline[parseInt(monthFilter)] !== 1) passTime = false; }
 
         if (passTime) {
             var alloc = parseNum(row[I_ALLOC]);
             var spent = parseNum(row[I_SPENT]);
             var typeVal = String(row[I_TYPE] || "").trim();
-            var srcVal = String(row[I_SOURCE] || "").trim();
             var deptVal = String(row[I_DEPT] || "ไม่ระบุ").trim(); 
             if(deptVal === "") deptVal = "ไม่ระบุ";
 
-            // Logic แยกประเภทงบ (MOPH vs Non-MOPH)
-            var isMoph = (
-                typeVal.indexOf('งบประมาณ') > -1 || typeVal.indexOf('สป.') > -1 || 
-                srcVal.indexOf('MOPH') > -1 || srcVal.indexOf('งบประมาณ') > -1 || srcVal.indexOf('สป.') > -1 ||
-                typeVal === 'PP' || typeVal === 'OP' || typeVal.indexOf('งบดำเนินงาน') > -1
+            // 🔥 [UPDATED LOGIC] เช็ค 'เงินนอก' จาก Col J (I_TYPE) เป็นหลัก
+            var isNonMoph = (
+                typeVal.indexOf('เงินนอก') > -1 || 
+                typeVal.indexOf('เงินบำรุง') > -1 || 
+                typeVal.indexOf('บริจาค') > -1 || 
+                typeVal.toUpperCase().indexOf('NON') > -1
             );
-            
-            var sourceGroup = isMoph ? "งบประมาณ (สป.สธ.)" : "เงินนอกงบประมาณ (Non-MOPH)";
 
-            // --- 2. บวกยอดเข้ากองกลาง ---
-            grandTotal.allocated += alloc; 
-            grandTotal.spent += spent; 
-            grandTotal.count++;
+            var sourceGroup = isNonMoph ? "เงินนอกงบประมาณ (Non-MOPH)" : "งบประมาณ (สป.สธ.)";
 
-            // --- 3. บวกยอดแยกตามแหล่งเงิน ---
+            grandTotal.allocated += alloc; grandTotal.spent += spent; grandTotal.count++;
+
             if (!bySource[sourceGroup]) bySource[sourceGroup] = { allocated: 0, spent: 0, count: 0 };
-            bySource[sourceGroup].allocated += alloc; 
-            bySource[sourceGroup].spent += spent; 
-            bySource[sourceGroup].count++;
+            bySource[sourceGroup].allocated += alloc; bySource[sourceGroup].spent += spent; bySource[sourceGroup].count++;
 
-            // --- 4. บวกยอดแยกตามกลุ่มงาน (All) ---
             if (!byDeptAll[deptVal]) byDeptAll[deptVal] = { allocated: 0, spent: 0, count: 0 };
-            byDeptAll[deptVal].allocated += alloc; 
-            byDeptAll[deptVal].spent += spent; 
-            byDeptAll[deptVal].count++;
+            byDeptAll[deptVal].allocated += alloc; byDeptAll[deptVal].spent += spent; byDeptAll[deptVal].count++;
 
-            // --- 5. บวกยอดแยกตามกลุ่มงาน (MOPH / Non) ---
-            if (isMoph) {
+            if (!isNonMoph) { // ถ้าไม่ใช่เงินนอก = MOPH
                 if (!byDeptMoph[deptVal]) byDeptMoph[deptVal] = { allocated: 0, spent: 0, count: 0 };
-                byDeptMoph[deptVal].allocated += alloc; 
-                byDeptMoph[deptVal].spent += spent; 
-                byDeptMoph[deptVal].count++;
-            } else {
+                byDeptMoph[deptVal].allocated += alloc; byDeptMoph[deptVal].spent += spent; byDeptMoph[deptVal].count++;
+            } else { // เงินนอก
                 if (!byDeptNon[deptVal]) byDeptNon[deptVal] = { allocated: 0, spent: 0, count: 0 };
-                byDeptNon[deptVal].allocated += alloc; 
-                byDeptNon[deptVal].spent += spent; 
-                byDeptNon[deptVal].count++;
+                byDeptNon[deptVal].allocated += alloc; byDeptNon[deptVal].spent += spent; byDeptNon[deptVal].count++;
             }
         }
     }
 
-    // Helper แปลง Object เป็น Array เพื่อส่งกลับไปวนลูปหน้าบ้าน
     var toList = function(obj) {
         var list = [];
-        for (var k in obj) {
-            list.push({ name: k, allocated: obj[k].allocated, spent: obj[k].spent, count: obj[k].count });
-        }
-        return list.sort(function(a, b) { return b.allocated - a.allocated; }); // เรียงตามงบมากไปน้อย
+        for (var k in obj) { list.push({ name: k, allocated: obj[k].allocated, spent: obj[k].spent, count: obj[k].count }); }
+        return list.sort(function(a, b) { return b.allocated - a.allocated; });
     };
 
-    return {
-        grandTotal: grandTotal,
-        bySource: toList(bySource),
-        byDeptAll: toList(byDeptAll),
-        byDeptMoph: toList(byDeptMoph),
-        byDeptNon: toList(byDeptNon)
-    };
-
+    return { grandTotal: grandTotal, bySource: toList(bySource), byDeptAll: toList(byDeptAll), byDeptMoph: toList(byDeptMoph), byDeptNon: toList(byDeptNon) };
   } catch (e) { return { error: e.message }; }
 }
 
@@ -697,74 +663,39 @@ function getDeptDetails(deptName, quarterFilter, monthFilter) {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     var sheet = ss.getSheetByName('m_actionplan');
     if (!sheet) return { error: "ไม่พบ Sheet m_actionplan" };
-    
     var data = sheet.getDataRange().getValues();
 
-    // 🎯 HARDCODE INDEX (ตาม Log เป๊ะๆ)
-    var I_DEPT = 4;
-    var I_PROJ = 6;
-    var I_ACT = 7;
-    var I_TYPE = 9;
-    var I_SOURCE = 10;
-    var I_ALLOC = 16;
-    var I_SPENT = 17;
-    
+    var I_DEPT = 4; var I_PROJ = 6; var I_ACT = 7; var I_TYPE = 9; var I_SOURCE = 10;
+    var I_APPROVE = 15; var I_ALLOC = 16; var I_SPENT = 17;
     var I_MONTHS = [26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37];
     var quarters = { 'Q1': [0, 1, 2], 'Q2': [3, 4, 5], 'Q3': [6, 7, 8], 'Q4': [9, 10, 11] };
-    
-    var parseNum = function(val) { 
-        var v = parseFloat(String(val).replace(/,/g, '')); 
-        return isNaN(v) ? 0 : v; 
-    };
-
-    // 🧼 ฟังก์ชันเครื่องบดละเอียด: ลบ Space, /, -, _ ออกให้หมด เหลือแต่ตัวหนังสือ
-    var cleanName = function(str) {
-        return String(str).replace(/[\s\/\-_]+/g, "").trim(); 
-    };
+    var parseNum = function(val) { var v = parseFloat(String(val).replace(/,/g, '')); return isNaN(v) ? 0 : v; };
+    var cleanName = function(str) { return String(str).replace(/[\s\/\-_]+/g, "").trim(); };
 
     var projectsAll = [], projectsMoph = [], projectsNon = [];
     var sumAll = { allocated: 0, spent: 0 }, sumMoph = { allocated: 0, spent: 0 }, sumNon = { allocated: 0, spent: 0 };
-    
-    // เตรียมชื่อเป้าหมายแบบ "สะอาด"
     var targetClean = cleanName(deptName);
 
-    // เริ่มวนลูป (ข้ามหัวตาราง)
     for (var i = 1; i < data.length; i++) {
         var row = data[i];
-        
-        // 1. ดึงชื่อจาก Excel แล้วทำความสะอาดก่อนเทียบ
         var rowDeptRaw = String(row[I_DEPT] || "");
-        var rowClean = cleanName(rowDeptRaw);
+        if (cleanName(rowDeptRaw).indexOf(targetClean) === -1 && targetClean.indexOf(cleanName(rowDeptRaw)) === -1) continue;
 
-        // 🔥 LOGIC การเทียบ: เทียบแบบเนื้อเน้นๆ (ไม่มี Slash มาขวาง)
-        // ถ้าเนื้อในไม่เหมือนกัน -> ข้าม
-        if (rowClean.indexOf(targetClean) === -1 && targetClean.indexOf(rowClean) === -1) {
-             continue; 
-        }
-
-        // 2. เช็ค Timeline
-        var timeline = I_MONTHS.map(function(idx) { 
-            return (String(row[idx] || "").trim() !== '') ? 1 : 0; 
-        });
-
+        var timeline = I_MONTHS.map(function(idx) { return (String(row[idx] || "").trim() !== '') ? 1 : 0; });
         var passTime = true;
-        if (quarterFilter && quarters[quarterFilter]) { 
-            if (!quarters[quarterFilter].some(function(mIdx) { return timeline[mIdx] === 1; })) passTime = false; 
-        }
-        if (monthFilter && String(monthFilter) !== "") { 
-            if (timeline[parseInt(monthFilter)] !== 1) passTime = false; 
-        }
+        if (quarterFilter && quarters[quarterFilter]) { if (!quarters[quarterFilter].some(function(mIdx) { return timeline[mIdx] === 1; })) passTime = false; }
+        if (monthFilter && String(monthFilter) !== "") { if (timeline[parseInt(monthFilter)] !== 1) passTime = false; }
 
-        // 3. เก็บข้อมูล
         if (passTime) {
+            var approve = parseNum(row[I_APPROVE]);
             var alloc = parseNum(row[I_ALLOC]);
             var spent = parseNum(row[I_SPENT]);
             var typeVal = String(row[I_TYPE] || "").trim();
-            var srcVal = String(row[I_SOURCE] || "").trim();
 
             var projObj = {
                 project: String(row[I_PROJ] || "-"),
                 activity: String(row[I_ACT] || "-"),
+                approved: approve,
                 allocated: alloc, 
                 spent: spent, 
                 balance: alloc - spent,
@@ -774,35 +705,33 @@ function getDeptDetails(deptName, quarterFilter, monthFilter) {
             projectsAll.push(projObj);
             sumAll.allocated += alloc; sumAll.spent += spent;
 
-            // Logic แยกประเภท
-            var isMoph = (
-                typeVal.indexOf('งบประมาณ') > -1 || typeVal.indexOf('สป.') > -1 || 
-                srcVal.indexOf('MOPH') > -1 || srcVal.indexOf('งบประมาณ') > -1 || srcVal.indexOf('สป.') > -1 ||
-                typeVal === 'PP' || typeVal === 'OP' || typeVal.indexOf('งบดำเนินงาน') > -1
+            // 🔥 [UPDATED LOGIC] ใช้ Logic เดียวกันทุกที่
+            var isNonMoph = (
+                typeVal.indexOf('เงินนอก') > -1 || 
+                typeVal.indexOf('เงินบำรุง') > -1 || 
+                typeVal.indexOf('บริจาค') > -1 || 
+                typeVal.toUpperCase().indexOf('NON') > -1
             );
-
-            if (isMoph) {
-                projectsMoph.push(projObj); sumMoph.allocated += alloc; sumMoph.spent += spent;
-            } else {
-                projectsNon.push(projObj); sumNon.allocated += alloc; sumNon.spent += spent;
+            
+            if (!isNonMoph) { // MOPH
+                projectsMoph.push(projObj);
+                sumMoph.allocated += alloc; sumMoph.spent += spent;
+            } else { // Non-MOPH
+                projectsNon.push(projObj);
+                sumNon.allocated += alloc; sumNon.spent += spent;
             }
         }
     }
 
     var sortFn = function(a, b) { return b.progress - a.progress; };
-    projectsAll.sort(sortFn); 
-    projectsMoph.sort(sortFn); 
-    projectsNon.sort(sortFn);
+    projectsAll.sort(sortFn); projectsMoph.sort(sortFn); projectsNon.sort(sortFn);
 
     return {
         projectsAll: projectsAll, projectsMoph: projectsMoph, projectsNon: projectsNon,
         sumAll: sumAll, sumMoph: sumMoph, sumNon: sumNon,
         deptName: deptName
     };
-
-  } catch (e) { 
-      return { error: "Server Error: " + e.message }; 
-  }
+  } catch (e) { return { error: "Server Error: " + e.message }; }
 }
 
 // ==========================================
