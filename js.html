@@ -751,16 +751,48 @@
   }
 
   function renderProjectTable(projectList, tbodyId) {
-      var tbody = $(tbodyId).empty();
-      if (!projectList || projectList.length === 0) { tbody.append('<tr><td colspan="5" class="text-center py-3 text-muted">ไม่พบข้อมูล</td></tr>'); return; }
-      var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
-      projectList.forEach(p => {
-          var pct = p.progress || 0;
-          var colorClass = (pct >= 80) ? 'bg-success' : (pct >= 50 ? 'bg-warning text-dark' : 'bg-danger');
-          var balColor = (p.balance < 0) ? 'text-danger' : 'text-success';
-          tbody.append(`<tr><td class="ps-3"><div class="fw-bold text-dark text-wrap" style="font-size: 0.95rem;">${p.project}</div><div class="small text-muted mt-1"><i class="fas fa-tasks me-1 opacity-50"></i>${p.activity}</div></td><td class="text-end fw-bold text-secondary">${fmt(p.allocated)}</td><td class="text-end fw-bold text-danger">${fmt(p.spent)}</td><td class="align-middle px-2"><div class="progress" style="height: 18px; background-color: #e9ecef;"><div class="progress-bar ${colorClass}" role="progressbar" style="width: ${pct}%">${pct.toFixed(1)}%</div></div></td><td class="text-end pe-3 fw-bold ${balColor}">${fmt(p.balance)}</td></tr>`);
-      });
-  }
+    var tbody = $(tbodyId).empty();
+    if (!projectList || projectList.length === 0) { 
+        tbody.append('<tr><td colspan="6" class="text-center py-3 text-muted">ไม่พบข้อมูล</td></tr>'); 
+        return; 
+    }
+    
+    var fmt = (n) => Number(n).toLocaleString(undefined, {minimumFractionDigits: 2});
+    
+    projectList.forEach(p => {
+        var pct = p.progress || 0;
+        var colorClass = (pct >= 80) ? 'bg-success' : (pct >= 50 ? 'bg-warning text-dark' : 'bg-danger');
+        var balColor = (p.balance < 0) ? 'text-danger' : 'text-success';
+
+        // 🛡️ Logic ตรวจสอบงบเกิน (Over Budget Check)
+        var approveShow = fmt(p.approved);
+        var allocShow = fmt(p.allocated);
+        
+        // ถ้าจัดสรร (allocated) มากกว่า อนุมัติ (approved) ให้ทำตัวแดง + ไอคอนเตือน
+        if (p.approved > 0 && p.allocated > p.approved) {
+            var diff = p.allocated - p.approved;
+            allocShow = `<span class="text-danger fw-bold" title="เกินงบอนุมัติ ${fmt(diff)} บาท">${fmt(p.allocated)} <i class="fas fa-exclamation-circle small"></i></span>`;
+        } else if (p.allocated < p.approved) {
+             allocShow = `<span class="text-muted">${fmt(p.allocated)}</span>`;
+        }
+
+        tbody.append(`
+            <tr>
+                <td class="ps-3">
+                    <div class="fw-bold text-dark text-wrap" style="font-size: 0.9rem;">${p.project}</div>
+                    <div class="small text-muted mt-1"><i class="fas fa-tasks me-1 opacity-50"></i>${p.activity}</div>
+                </td>
+                <td class="text-end text-primary fw-bold">${approveShow}</td> <td class="text-end fw-bold">${allocShow}</td> <td class="text-end fw-bold text-danger">${fmt(p.spent)}</td>
+                <td class="align-middle px-2">
+                    <div class="progress" style="height: 18px; background-color: #e9ecef;">
+                        <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${pct}%">${pct.toFixed(1)}%</div>
+                    </div>
+                </td>
+                <td class="text-end pe-3 fw-bold ${balColor}">${fmt(p.balance)}</td>
+            </tr>
+        `);
+    });
+}
 
   function updateDrillDownCards(type) {
       if (!CURRENT_DD_DATA) return;
