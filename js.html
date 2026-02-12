@@ -291,77 +291,99 @@
   }
 
   function renderTxTable(rows) {
-      // 1. ล้างค่า DataTables เดิม
-      if ($.fn.DataTable.isDataTable('#tableTxHistoryNew')) { 
-          $('#tableTxHistoryNew').DataTable().destroy(); 
-      }
+    // 1. ล้างค่า DataTables เดิม
+    if ($.fn.DataTable.isDataTable('#tableTxHistoryNew')) { 
+        $('#tableTxHistoryNew').DataTable().destroy(); 
+    }
 
-      var tbody = $('#txHistoryTable'); 
-      tbody.empty();
+    var tbody = $('#txHistoryTable'); 
+    tbody.empty();
 
-      // 2. ถ้าไม่มีข้อมูล
-      if (!rows || rows.length === 0) {
-          tbody.append('<tr><td colspan="6" class="text-center py-5 text-muted"><i class="fas fa-inbox fa-3x mb-3 opacity-25"></i><br>ยังไม่มีรายการเบิกจ่าย</td></tr>');
-          return;
-      }
+    // 2. ถ้าไม่มีข้อมูล
+    if (!rows || rows.length === 0) {
+        // ⚠️ [แก้ไข] ปรับ colspan เป็น 9 (เพราะเพิ่มมา 3 คอลัมน์)
+        tbody.append('<tr><td colspan="9" class="text-center py-5 text-muted"><i class="fas fa-inbox fa-3x mb-3 opacity-25"></i><br>ยังไม่มีรายการเบิกจ่าย</td></tr>');
+        return;
+    }
 
-      // 3. วนลูปสร้างแถว
-      rows.forEach(r => {
-          // จัดการ Badge แหล่งเงิน
-          var sourceBadge = (r.source && (r.source.includes('Non') || r.source.includes('นอก'))) 
-              ? '<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 ms-1">Non-MOPH</span>' 
-              : '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1">MOPH</span>';
-          
-          // ✅ [จุดแก้ไขสำคัญ] แสดงวันที่เต็มๆ ไม่ต้อง split ตัดคำ
-          // (ค่า r.date ส่งมาจาก Server เป็น "8 ก.พ. 2569" แล้ว)
-          var dateShow = `<div class="fw-bold text-primary" style="font-size: 1rem;">${r.date}</div>`;
-          
-          var amountShow = Number(Math.abs(r.amount)).toLocaleString();
+    // 3. วนลูปสร้างแถว
+    rows.forEach(r => {
+        // จัดการ Badge แหล่งเงิน
+        var sourceBadge = (r.source && (r.source.includes('Non') || r.source.includes('นอก'))) 
+            ? '<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 ms-1">Non-MOPH</span>' 
+            : '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1">MOPH</span>';
+        
+        var dateShow = `<div class="fw-bold text-primary" style="font-size: 1rem;">${r.date}</div>`;
+        
+        // ฟอร์แมตตัวเลข (ใส่ลูกน้ำ)
+        var amountShow = Number(r.amount).toLocaleString();
+        
+        // ✅ [เพิ่ม] ตัวแปรสำหรับ 3 คอลัมน์ใหม่จาก Master (กันเหนียวถ้าค่าเป็น null ให้โชว์ 0)
+        var masterAlloc = Number(r.masterAllocated || 0).toLocaleString();
+        var masterSpent = Number(r.masterSpent || 0).toLocaleString();
+        var masterBal   = Number(r.masterBalance || 0).toLocaleString();
 
-          tbody.append(`
-              <tr>
-                  <td class="ps-4 text-center text-muted fw-bold">${r.order}</td>
-                  <td class="text-center">${dateShow}</td> <td>
-                      <div class="fw-bold text-dark text-wrap" style="line-height: 1.4;">${r.project}</div>
-                      <div class="small text-muted text-wrap mt-1">${r.activity}</div>
-                  </td>
-                  <td>
-                      <div class="text-wrap text-muted small" style="line-height: 1.4;">${r.desc || '-'}</div>
-                      <div class="mt-1">
-                          <span class="badge bg-secondary fw-normal">${r.type}</span> ${sourceBadge}
-                      </div>
-                  </td>
-                  <td class="text-end pe-4">
-                      <span class="h6 fw-bold text-dark mb-0">${amountShow}</span>
-                  </td>
-                  <td class="text-center">
-                      <div class="d-flex justify-content-center gap-1">
-                          <button class="btn btn-sm btn-light text-warning hover-warning" title="แก้ไข" onclick="confirmTxAction('edit', '${r.order}')">
-                              <i class="fas fa-pen"></i>
-                          </button>
-                          <button class="btn btn-sm btn-light text-danger hover-danger" title="ลบรายการ" onclick="confirmTxAction('delete', '${r.order}')">
-                              <i class="fas fa-trash-alt"></i>
-                          </button>
-                      </div>
-                  </td>
-              </tr>
-          `);
-      });
+        tbody.append(`
+            <tr>
+                <td class="ps-4 text-center text-muted fw-bold">${r.order || '-'}</td>
+                
+                <td class="text-center text-nowrap">${dateShow}</td> 
+                
+                <td>
+                    <div class="fw-bold text-dark text-wrap" style="line-height: 1.4;">${r.project}</div>
+                    <div class="small text-muted text-wrap mt-1">${r.activity || ''}</div>
+                </td>
+                
+                <td>
+                    <div class="text-wrap text-muted small" style="line-height: 1.4;">${r.desc || '-'}</div>
+                    <div class="mt-1">
+                        <span class="badge bg-secondary fw-normal">${r.type || '-'}</span> ${sourceBadge}
+                    </div>
+                </td>
+                
+                <td class="text-end pe-4">
+                    <span class="h6 fw-bold text-dark mb-0">${amountShow}</span>
+                </td>
 
-      // 4. สร้าง DataTable ใหม่
-      $('#tableTxHistoryNew').DataTable({ 
-          "pageLength": 10, 
-          "lengthChange": false, 
-          "searching": true, 
-          "language": { 
-              "search": "ค้นหา:", 
-              "paginate": { "next": ">", "previous": "<" }, 
-              "emptyTable": "ไม่พบข้อมูล",
-              "info": "แสดง _START_ ถึง _END_ จาก _TOTAL_ รายการ"
-          }, 
-          "order": [] // ปิด Auto Sort เพื่อให้เรียงตามที่ส่งมาจาก Server
-      });
-  }
+                <td class="text-end text-dark bg-light bg-opacity-25">
+                    ${masterAlloc}
+                </td>
+
+                <td class="text-end text-success bg-light bg-opacity-25">
+                    ${masterSpent}
+                </td>
+
+                <td class="text-end text-primary fw-bold bg-light bg-opacity-50">
+                    ${masterBal}
+                </td>
+                <td class="text-center">
+                    <div class="d-flex justify-content-center gap-1">
+                        <button class="btn btn-sm btn-light text-warning hover-warning" title="แก้ไข" onclick="confirmTxAction('edit', '${r.rowId}')">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button class="btn btn-sm btn-light text-danger hover-danger" title="ลบรายการ" onclick="confirmTxAction('delete', '${r.rowId}')">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `);
+    });
+
+    // 4. สร้าง DataTable ใหม่
+    $('#tableTxHistoryNew').DataTable({ 
+        "pageLength": 10, 
+        "lengthChange": false, 
+        "searching": true, 
+        "language": { 
+            "search": "ค้นหา:", 
+            "paginate": { "next": ">", "previous": "<" }, 
+            "emptyTable": "ไม่พบข้อมูล",
+            "info": "แสดง _START_ ถึง _END_ จาก _TOTAL_ รายการ"
+        }, 
+        "order": [] 
+    });
+}
 
   function confirmTxAction(action, id) {
       if (action === 'delete') {
