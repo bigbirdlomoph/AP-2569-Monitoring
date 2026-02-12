@@ -1,6 +1,6 @@
 var SPREADSHEET_ID = '1BhZDqEU7XKhgYgYnBrbFI7IMbr_SLdhU8rvhAMddodQ'; 
 var SHEET_NAME = 'm_actionplan';
-var APP_VERSION = '6900211-1330'; 
+var APP_VERSION = '6900212-1000'; 
 
 function doGet() {
   var template = HtmlService.createTemplateFromFile('index');
@@ -14,6 +14,7 @@ function doGet() {
 function include(filename) { return HtmlService.createHtmlOutputFromFile(filename).getContent(); }
 
 // 1. DATA LOADER (MASTER DATA)
+// 📌 [UPDATE] เพิ่มการส่งค่า loan (เงินยืมสะสม Col S) ไปหน้าบ้าน
 function getAllMasterDataForClient() {
   try {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -23,15 +24,6 @@ function getAllMasterDataForClient() {
     if (data.length < 2) return [];
     data.shift(); // ตัดหัวตาราง
 
-    // 🎯 MAPPING INDEX (เช็คตามไฟล์จริงของท่าน)
-    // [0]=ID, [2]=หมวด, [3]=ลำดับ, [4]=กลุ่มงาน, [5]=แผนงาน
-    // [6]=โครงการ, [7]=กิจกรรม, [8]=ย่อย
-    // [9]=ประเภท, [10]=แหล่ง
-    // [15]=อนุมัติ (Column P) ✅ เพิ่มตัวนี้
-    // [16]=จัดสรร (Column Q)
-    // [17]=เบิกจ่าย (Column R)
-    // [19]=คงเหลือ (Column T)
-    
     return data.map(function(r) {
       return {
         id: r[0],
@@ -45,12 +37,15 @@ function getAllMasterDataForClient() {
         budgetType: r[9],
         budgetSource: r[10],
         
-        // ✅ ดึงยอดอนุมัติจาก Column P (Index 15)
-        approved: parseFloat(String(r[15]).replace(/,/g,'')) || 0,
+        // ตัวเลขต่างๆ
+        approved: parseFloat(String(r[15]).replace(/,/g,'')) || 0, // P อนุมัติ
+        allocated: parseFloat(String(r[16]).replace(/,/g,'')) || 0, // Q จัดสรร
+        spent: parseFloat(String(r[17]).replace(/,/g,'')) || 0,     // R เบิกจ่าย
         
-        allocated: parseFloat(String(r[16]).replace(/,/g,'')) || 0,
-        spent: parseFloat(String(r[17]).replace(/,/g,'')) || 0,
-        balance: parseFloat(String(r[19]).replace(/,/g,'')) || 0
+        // ✅ [เพิ่มใหม่] เงินยืมสะสม (Col S = Index 18)
+        loan: parseFloat(String(r[18]).replace(/,/g,'')) || 0,
+        
+        balance: parseFloat(String(r[19]).replace(/,/g,'')) || 0    // T คงเหลือ
       };
     }).filter(function(r) { return r.id && r.project; }); 
   } catch (e) { return []; }
@@ -225,77 +220,88 @@ function deleteTransaction(rowId, projectId, amount) {
 }
 
 // 5. LOAN FUNCTIONS (Save & Repay)
+// 📌 [FIXED v3] saveLoan: แก้ไขลำดับการทำงาน ป้องกัน Master อัพเดตแต่ Log หาย
 function saveLoan(form) {
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(10000); 
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     
-    // 1. เตรียมข้อมูล Master
-    var mSheet = ss.getSheetByName(SHEET_NAME); // m_actionplan
-    var mData = mSheet.getDataRange().getValues();
+    // 1. เช็ค Sheet ให้ครบก่อนเริ่มงาน (ป้องกันตายกลางทาง)
+    var mSheet = ss.getSheetByName('m_actionplan');
+    var tSheet = ss.getSheetByName('t_loan');
     
-    // ค้นหาแถวของโครงการใน Master
-    var idxID = 0; // Col A
-    var idxLoan = 18; // Col S (เงินยืมสะสมใน Master)
+    if (!mSheet) return { status: 'error', message: 'ไม่พบ Sheet: m_actionplan' };
+    if (!tSheet) return { status: 'error', message: 'ไม่พบ Sheet: t_loan (กรุณาสร้าง Sheet นี้)' };
+
+    var mData = mSheet.getDataRange().getValues();
+    var idxID = 0;    // Col A
+    var idxLoan = 18; // Col S (เงินยืมสะสม)
     var rowIndex = -1;
     
+    // 2. ค้นหา ID
+    var targetId = String(form.projectId).trim();
     for (var i = 1; i < mData.length; i++) { 
-      if (String(mData[i][idxID]) === String(form.projectId)) { 
+      if (String(mData[i][idxID]).trim() === targetId) { 
         rowIndex = i + 1; 
         break; 
       } 
     }
     
-    // อัปเดตยอดเงินยืมสะสมใน Master (บวกเพิ่ม)
-    if (rowIndex !== -1) {
-       var cur = (parseFloat(String(mSheet.getRange(rowIndex, idxLoan+1).getValue()).replace(/,/g,'')) || 0) + parseFloat(form.amount);
-       mSheet.getRange(rowIndex, idxLoan+1).setValue(cur);
-    }
+    if (rowIndex === -1) return { status: 'error', message: 'ไม่พบรหัสโครงการนี้ใน Master (ID: ' + form.projectId + ')' };
     
-    // 2. บันทึกลง Transaction (t_loan)
-    var tSheet = ss.getSheetByName('t_loan');
-    var r = mData[rowIndex-1]; // ดึงข้อมูลแถวนั้นจาก Master มาใช้
+    // 3. เตรียมข้อมูลทั้งหมด "ก่อน" ลงมือเขียน (Prepare Data)
+    var r = mData[rowIndex-1]; // ข้อมูล Master
+    
+    var cellMasterLoan = mSheet.getRange(rowIndex, idxLoan+1);
+    var currentMasterLoan = parseFloat(String(cellMasterLoan.getValue()).replace(/,/g,'')) || 0;
+    var loanAmt = parseFloat(String(form.amount).replace(/,/g,'')) || 0;
+    var newMasterLoan = currentMasterLoan + loanAmt;
 
-    // แปลงวันที่เริ่ม-สิ้นสุด (ถ้ามี)
     var sDate = form.startDate ? new Date(form.startDate) : "";
     var eDate = form.endDate ? new Date(form.endDate) : "";
 
-    // 🔥 เรียงข้อมูลลงตาราง t_loan (27 คอลัมน์ ตามที่นายท่านระบุ)
+    // 4. เริ่มลงมือเขียน (Write Data)
+    
+    // 4.1 อัพเดต Master
+    cellMasterLoan.setValue(newMasterLoan);
+    SpreadsheetApp.flush(); // ดันข้อมูลลง Master ทันที
+
+    // 4.2 บันทึกลง Log (t_loan)
     tSheet.appendRow([
-       new Date(),       // 1. ประทับเวลา (A)
-       r[0],             // 2. รหัสโครงการ (B)
-       r[1],             // 3. ปีงบประมาณ (C)
-       r[2],             // 4. หมวด (D)
-       r[3],             // 5. ลำดับโครงการ (E)
-       r[4],             // 6. กลุ่มงาน/งาน (F)
-       r[5],             // 7. แผนงาน (G)
-       r[6],             // 8. โครงการ (H)
-       r[7],             // 9. กิจกรรมหลัก (I)
-       r[8],             // 10. กิจกรรมย่อย (J)
-       r[9],             // 11. ประเภทงบ (K)
-       r[10],            // 12. แหล่งงบประมาณ (L)
-       r[13],            // 13. รหัสงบประมาณ (M)
-       r[14],            // 14. รหัสกิจกรรม (N)
-       r[16],            // 15. จัดสรร (O)
-       form.amount,      // 16. เงินยืม (P) -> รับจากฟอร์ม
-       form.loanDate,    // 17. วันที่ยืมเงิน (Q)
-       form.loanType,    // 18. ประเภทเงินยืม (R)
-       form.desc,        // 19. รายละเอียด (S)
-       "ยังไม่ดำเนินการ",  // 20. สถานะการเบิกจ่าย (T)
-       0,                // 21. จำนวนเบิกจ่าย (U) -> เริ่มต้นเป็น 0
-       form.amount,      // 22. คงเหลือ (V) -> เริ่มต้นเท่ากับยอดกู้
-       "",               // 23. วันที่เบิกจ่าย (W) -> ว่างไว้
-       "",               // 24. ระยะเวลาที่ยืม (X) -> ว่างไว้
-       "",               // 25. หมายเหตุ (Y) -> ว่างไว้
-       sDate,            // 26. เริ่มดำเนินการ (Z) ✅
-       eDate             // 27. สิ้นสุดดำเนินการ (AA) ✅
+       new Date(),       // 1. A
+       r[0],             // 2. B
+       r[1],             // 3. C
+       r[2],             // 4. D
+       r[3],             // 5. E
+       r[4],             // 6. F
+       r[5],             // 7. G
+       r[6],             // 8. H
+       r[7],             // 9. I
+       r[8],             // 10. J
+       r[9],             // 11. K
+       r[10],            // 12. L
+       r[13],            // 13. M
+       r[14],            // 14. N
+       r[16],            // 15. O (ยอดจัดสรร)
+       loanAmt,          // 16. P (เงินยืมครั้งนี้)
+       form.loanDate,    // 17. Q
+       form.loanType,    // 18. R
+       form.desc,        // 19. S
+       "ยังไม่ดำเนินการ",  // 20. T
+       0,                // 21. U
+       loanAmt,          // 22. V
+       "",               // 23. W
+       "",               // 24. X
+       "",               // 25. Y
+       sDate,            // 26. Z
+       eDate             // 27. AA
     ]);
     
     return { status: 'success', message: 'บันทึกเงินยืมเรียบร้อย' };
 
   } catch (e) { 
-    return { status: 'error', message: e.message }; 
+    return { status: 'error', message: 'System Error: ' + e.message }; 
   } finally { 
     lock.releaseLock(); 
   }
@@ -419,11 +425,85 @@ function updateLoanRepayment(data) {
 }
 
 // 6. HISTORY GETTERS (Fixed Indices)
-function getTransactionHistory() { return getHistory('t_actionplan'); }
+// 📌 [UPDATE] เพิ่มการดึงยอด จัดสรร/คงเหลือ/เบิกจ่าย จาก Master มาแปะใน Transaction
+function getTransactionHistory() {
+  try {
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var tSheet = ss.getSheetByName('t_actionplan');
+    if (!tSheet) return [];
+    
+    // 1. เตรียมข้อมูล Master (ทำ Map รอไว้ เพื่อความเร็ว)
+    var mSheet = ss.getSheetByName('m_actionplan');
+    var masterMap = {};
+    if (mSheet) {
+      var mData = mSheet.getDataRange().getValues();
+      // เริ่ม loop i=1 ข้าม header
+      for (var i = 1; i < mData.length; i++) {
+        var pid = String(mData[i][0]).trim(); // Col A = ID
+        if (pid) {
+          masterMap[pid] = {
+            allocated: parseFloat(String(mData[i][16]).replace(/,/g,'')) || 0, // Col Q จัดสรร
+            spent: parseFloat(String(mData[i][17]).replace(/,/g,'')) || 0,     // Col R เบิกจ่าย
+            balance: parseFloat(String(mData[i][19]).replace(/,/g,'')) || 0    // Col T คงเหลือ
+          };
+        }
+      }
+    }
 
-  // function getLoanHistory() { 
-  //   return getHistory('t_loan'); 
-  //   }
+    // 2. ดึงข้อมูล Transaction
+    var data = tSheet.getDataRange().getDisplayValues();
+    if (data.length < 2) return [];
+    
+    var result = [];
+    var parseAmount = function(v) { return parseFloat(String(v).replace(/,/g, '')) || 0; };
+    
+    // Helper แปลงวันที่
+    var toThaiDate = function(val) {
+      if (!val) return "-";
+      try {
+        var d = new Date(val);
+        if (isNaN(d.getTime())) return String(val);
+        var months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+        return d.getDate() + " " + months[d.getMonth()] + " " + (d.getFullYear() + 543);
+      } catch (ex) { return String(val); }
+    };
+
+    // Loop ย้อนหลัง (ล่าสุดขึ้นก่อน)
+    for (var i = data.length - 1; i >= 1; i--) { 
+      var row = data[i];
+      if (!row || (!row[0] && !row[1])) continue;
+      
+      var projId = String(row[1]).trim(); // ID ใน Transaction
+      var masterInfo = masterMap[projId] || { allocated: 0, spent: 0, balance: 0 }; // ดึงจาก Map
+
+      var item = {
+          rowId: i+1,
+          order: row[4], 
+          project: row[7], 
+          activity: row[8], 
+          subActivity: row[9],
+          amount: parseAmount(row[15]),
+          date: toThaiDate(row[17]), 
+          type: row[18], 
+          source: row[11], 
+          desc: row[19], 
+          id: row[1],
+          
+          // ✅ [เพิ่มใหม่] ข้อมูลจาก Master
+          masterAllocated: masterInfo.allocated,
+          masterSpent: masterInfo.spent,
+          masterBalance: masterInfo.balance
+      };
+      
+      if(item.amount > 0 || item.order) result.push(item);
+      if (result.length >= 100) break; // Limit 100 รายการ
+    }
+    return result;
+  } catch(e) { 
+    return []; 
+  }
+}
+
   // 📌 [แทนที่] ฟังก์ชัน getLoanHistory ในไฟล์ Code.gs (เพิ่มวันที่ไทย)
 function getLoanHistory() {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -786,76 +866,86 @@ function searchLoanHistory(criteria) {
   // ==========================================
   // 9. NEW ALLOCATION SYSTEM (Backend)
   // ==========================================
+  // 📌 [FIXED] saveAllocation: แก้ไข Logic การบวกยอดและค้นหา ID
+// 📌 [FIXED v3] saveAllocation: แก้ไขให้ Log และ Update Master ทำงานสัมพันธ์กัน 100%
+function saveAllocation(form) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000); 
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var mSheet = ss.getSheetByName('m_actionplan');
+    var tAllocSheet = ss.getSheetByName('t_allocate');
+    
+    // 1. ตรวจสอบ Sheet
+    if (!mSheet) return { status: 'error', message: 'ไม่พบ Sheet Master' };
+    if (!tAllocSheet) return { status: 'error', message: 'ไม่พบ Sheet t_allocate' };
 
-  function saveAllocation(form) {
-    var lock = LockService.getScriptLock();
-    try {
-      lock.waitLock(10000); // ป้องกันการบันทึกชนกัน
-      var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-      var mSheet = ss.getSheetByName('m_actionplan');
-      var tAllocSheet = ss.getSheetByName('t_allocate');
-      
-      // 1. หาแถวใน Master Plan (m_actionplan)
-      var mData = mSheet.getDataRange().getValues();
-      var rowIndex = -1;
-      for (var i = 1; i < mData.length; i++) {
-        if (String(mData[i][0]) == String(form.id)) { // เทียบ ID
-          rowIndex = i + 1;
-          break;
-        }
+    // 2. ค้นหา ID โครงการ (Col A)
+    var mData = mSheet.getDataRange().getValues();
+    var rowIndex = -1;
+    var targetId = String(form.id).trim(); // ตัดช่องว่างให้ชัวร์
+
+    for (var i = 1; i < mData.length; i++) {
+      if (String(mData[i][0]).trim() === targetId) { 
+        rowIndex = i + 1;
+        break;
       }
-
-      if (rowIndex === -1) return { status: 'error', message: 'ไม่พบรหัสโครงการในฐานข้อมูล' };
-
-      // 2. คำนวณยอดเงินใหม่ (Accumulate Logic)
-      // Col Q (Index 16+1 = 17) คือ ยอดจัดสรร
-      var cellAlloc = mSheet.getRange(rowIndex, 17);
-      var currentTotal = parseFloat(String(cellAlloc.getValue()).replace(/,/g,'')) || 0;
-      var newTotal = currentTotal + parseFloat(form.currentAlloc);
-
-      // 3. อัปเดต Master Plan
-      cellAlloc.setValue(newTotal);
-
-      // 4. บันทึก Log ลง t_allocate
-      // โครงสร้าง Columns A-S (19 Columns)
-      var r = form.fullData; // ข้อมูลเดิมจาก Client (เพื่อความสะดวกในการ Mapping)
-      
-      // *หมายเหตุ: บาง Field ถ้าไม่มีใน JSON ให้เว้นว่าง หรือดึงจาก mData ก็ได้
-      // เพื่อความแม่นยำ ผมจะดึงจาก mData แถวที่เจอ
-      var mRow = mData[rowIndex-1]; 
-      
-      var logRow = [
-        new Date(),       // A: Timestamp
-        mRow[0],          // B: รหัสโครงการ (ID)
-        mRow[1],          // C: ปีงบ
-        mRow[2],          // D: หมวด
-        mRow[3],          // E: ลำดับ
-        mRow[4],          // F: กลุ่มงาน
-        mRow[5],          // G: แผนงาน
-        mRow[6],          // H: โครงการ
-        mRow[7],          // I: กิจกรรมหลัก
-        mRow[8],          // J: กิจกรรมย่อย
-        mRow[9],          // K: ประเภทงบ
-        mRow[10],         // L: แหล่งงบ
-        mRow[13],         // M: รหัสงบประมาณ
-        mRow[14],         // N: รหัสกิจกรรม
-        newTotal,         // O: จัดสรรสะสม (ยอดใหม่) ✅
-        form.currentAlloc,// P: จัดสรรครั้งนี้ ✅
-        form.date,        // Q: วันที่จัดสรร ✅
-        form.letterNo,    // R: เลขหนังสือ ✅
-        form.remark       // S: หมายเหตุ ✅
-      ];
-
-      tAllocSheet.appendRow(logRow);
-
-      return { status: 'success', message: 'บันทึกเรียบร้อย' };
-
-    } catch (e) {
-      return { status: 'error', message: e.message };
-    } finally {
-      lock.releaseLock();
     }
+
+    if (rowIndex === -1) return { status: 'error', message: 'ไม่พบรหัสโครงการนี้ใน Master (ID: ' + form.id + ')' };
+
+    // 3. คำนวณยอดเงินใหม่ (Col Q = Index 17)
+    var cellAlloc = mSheet.getRange(rowIndex, 17);
+    
+    // แปลงค่าเดิมเป็นตัวเลข (รองรับทั้งแบบมีคอมม่าและไม่มี)
+    var rawVal = String(cellAlloc.getValue()); 
+    var currentTotal = parseFloat(rawVal.replace(/,/g,'')) || 0;
+    
+    // แปลงยอดที่จะเพิ่ม
+    var addAmount = parseFloat(String(form.currentAlloc).replace(/,/g,'')) || 0;
+    
+    var newTotal = currentTotal + addAmount;
+
+    // 4. อัปเดต Master Plan (ทำก่อน Log)
+    cellAlloc.setValue(newTotal);
+    // บังคับ Flush ให้มั่นใจว่าค่าลงชีตแล้วจริงๆ
+    SpreadsheetApp.flush(); 
+
+    // 5. บันทึก Log ลง t_allocate
+    var r = mData[rowIndex-1]; // ดึงข้อมูล Master แถวที่เจอ
+    
+    var logRow = [
+      new Date(),       // A: Timestamp
+      r[0],             // B: ID
+      r[1],             // C: ปีงบ
+      r[2],             // D: หมวด
+      r[3],             // E: ลำดับ
+      r[4],             // F: กลุ่มงาน
+      r[5],             // G: แผนงาน
+      r[6],             // H: โครงการ
+      r[7],             // I: กิจกรรมหลัก
+      r[8],             // J: กิจกรรมย่อย
+      r[9],             // K: ประเภทงบ
+      r[10],            // L: แหล่งงบ
+      r[13],            // M: รหัสงบ
+      r[14],            // N: รหัสกิจกรรม
+      newTotal,         // O: จัดสรรสะสม (ยอดใหม่) ✅
+      addAmount,        // P: จัดสรรครั้งนี้ ✅
+      form.date,        // Q: วันที่จัดสรร
+      form.letterNo,    // R: เลขหนังสือ
+      form.remark       // S: หมายเหตุ
+    ];
+
+    tAllocSheet.appendRow(logRow);
+
+    return { status: 'success', message: 'บันทึกจัดสรรสำเร็จ (ยอดใหม่: ' + newTotal.toLocaleString() + ')' };
+
+  } catch (e) {
+    return { status: 'error', message: 'System Error: ' + e.message };
+  } finally {
+    lock.releaseLock();
   }
+}
 
   function getAllocationHistory() {
     try {
