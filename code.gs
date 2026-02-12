@@ -1,6 +1,6 @@
 var SPREADSHEET_ID = '1BhZDqEU7XKhgYgYnBrbFI7IMbr_SLdhU8rvhAMddodQ'; 
 var SHEET_NAME = 'm_actionplan';
-var APP_VERSION = '6900212-1000'; 
+var APP_VERSION = '6900212-1600'; 
 
 function doGet() {
   var template = HtmlService.createTemplateFromFile('index');
@@ -183,14 +183,31 @@ function saveTransaction(form) {
 
     // Update Master
     var currentSpent = (parseFloat(String(mSheet.getRange(rowIndex, idxSpent + 1).getValue()).replace(/,/g,'')) || 0) + parseFloat(form.amount);
+    var allocated = parseFloat(String(mSheet.getRange(rowIndex, 17).getValue()).replace(/,/g,'')) || 0; // ดึงยอดจัดสรร
+    var balanceAfterTx = allocated - currentSpent; // คำนวณยอดคงเหลือ
     mSheet.getRange(rowIndex, idxSpent + 1).setValue(currentSpent);
 
     // Save Log
     // RowData มาจาก mData[rowIndex-1]
     var r = mData[rowIndex-1];
-    tSheet.appendRow([ new Date(), r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[13], r[14], r[16], form.amount, 0, form.txDate, form.expenseType, form.desc, r[0] ]); // เพิ่ม ID ที่ column สุดท้าย
+      tSheet.appendRow([ 
+          new Date(),       // 1. Timestamp (A)
+          r[0],             // 2. ID (B)
+          r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[13], r[14], r[16], 
+          form.amount,      // 16. Amount (P)
+          0,                // 17. Reserved (Q)
+          form.txDate,      // 18. Date (R)
+          form.expenseType, // 19. Type (S)
+          form.desc,        // 20. Desc (T)          
+          form.remark,       // 21. ✅ Remark (U) 
+          "",               // 22. (V) ว่าง
+          "",               // 23. (W) ว่าง
+          "",               // 24. Reason (X) ว่างไว้ 
+          balanceAfterTx    // 25. ✅ Balance (Y) ยอดคงเหลือหลังหัก
+      ]); 
     
     return { status: 'success', message: 'บันทึกเรียบร้อย' };
+
   } catch (e) { return { status: 'error', message: e.message }; } finally { lock.releaseLock(); }
 }
 
@@ -868,6 +885,7 @@ function searchLoanHistory(criteria) {
   // ==========================================
   // 📌 [FIXED] saveAllocation: แก้ไข Logic การบวกยอดและค้นหา ID
 // 📌 [FIXED v3] saveAllocation: แก้ไขให้ Log และ Update Master ทำงานสัมพันธ์กัน 100%
+// 📌 [FIXED v4] saveAllocation: แก้ไข Logic ค้นหาบรรทัดให้แม่นยำ (Project + Activity + Sub)
 function saveAllocation(form) {
   var lock = LockService.getScriptLock();
   try {
@@ -880,24 +898,46 @@ function saveAllocation(form) {
     if (!mSheet) return { status: 'error', message: 'ไม่พบ Sheet Master' };
     if (!tAllocSheet) return { status: 'error', message: 'ไม่พบ Sheet t_allocate' };
 
-    // 2. ค้นหา ID โครงการ (Col A)
+    // 2. ค้นหาบรรทัดที่ถูกต้อง (Match ID + Activity + SubActivity)
     var mData = mSheet.getDataRange().getValues();
     var rowIndex = -1;
-    var targetId = String(form.id).trim(); // ตัดช่องว่างให้ชัวร์
+    var targetId = String(form.id).trim(); 
+    
+    // รับค่า Activity/SubActivity ที่ส่งมา (ถ้ามี)
+    var targetAct = form.fullData ? String(form.fullData.activity || "").trim() : "";
+    var targetSub = form.fullData ? String(form.fullData.subActivity || "").trim() : "";
 
     for (var i = 1; i < mData.length; i++) {
-      if (String(mData[i][0]).trim() === targetId) { 
+      var rowId = String(mData[i][0]).trim();     // Col A: ID
+      var rowAct = String(mData[i][7]).trim();    // Col H: Activity (Index 7)
+      var rowSub = String(mData[i][8]).trim();    // Col I: SubActivity (Index 8)
+
+      // 🔥 เงื่อนไขการ Match: ต้องตรงทั้ง ID และ กิจกรรม (ถ้า ID ซ้ำกันหลายบรรทัด)
+      var isIdMatch = (rowId === targetId);
+      var isActMatch = (rowAct === targetAct);
+      var isSubMatch = (rowSub === targetSub);
+
+      if (isIdMatch && isActMatch && isSubMatch) { 
         rowIndex = i + 1;
-        break;
+        break; // เจอบรรทัดที่ถูกต้องเป๊ะๆ แล้วหยุดค้นหา
       }
     }
 
-    if (rowIndex === -1) return { status: 'error', message: 'ไม่พบรหัสโครงการนี้ใน Master (ID: ' + form.id + ')' };
+    if (rowIndex === -1) {
+        // Fallback: ถ้าหาแบบละเอียดไม่เจอ ลองหาแค่ ID อย่างเดียว (เผื่อชื่อกิจกรรมมีการแก้ไข)
+        for (var i = 1; i < mData.length; i++) {
+            if (String(mData[i][0]).trim() === targetId) { 
+                rowIndex = i + 1;
+                break;
+            }
+        }
+        if (rowIndex === -1) return { status: 'error', message: 'ไม่พบรหัสโครงการนี้ใน Master (ID: ' + form.id + ')' };
+    }
 
     // 3. คำนวณยอดเงินใหม่ (Col Q = Index 17)
-    var cellAlloc = mSheet.getRange(rowIndex, 17);
+    var cellAlloc = mSheet.getRange(rowIndex, 17); // Col Q คือ Index 16+1 = 17
     
-    // แปลงค่าเดิมเป็นตัวเลข (รองรับทั้งแบบมีคอมม่าและไม่มี)
+    // แปลงค่าเดิมเป็นตัวเลข
     var rawVal = String(cellAlloc.getValue()); 
     var currentTotal = parseFloat(rawVal.replace(/,/g,'')) || 0;
     
@@ -906,13 +946,12 @@ function saveAllocation(form) {
     
     var newTotal = currentTotal + addAmount;
 
-    // 4. อัปเดต Master Plan (ทำก่อน Log)
+    // 4. อัปเดต Master Plan
     cellAlloc.setValue(newTotal);
-    // บังคับ Flush ให้มั่นใจว่าค่าลงชีตแล้วจริงๆ
-    SpreadsheetApp.flush(); 
+    SpreadsheetApp.flush(); // บังคับเขียนทันที
 
     // 5. บันทึก Log ลง t_allocate
-    var r = mData[rowIndex-1]; // ดึงข้อมูล Master แถวที่เจอ
+    var r = mData[rowIndex-1]; // ข้อมูล Master แถวที่เจอ
     
     var logRow = [
       new Date(),       // A: Timestamp
@@ -946,6 +985,7 @@ function saveAllocation(form) {
     lock.releaseLock();
   }
 }
+// end saveAllocation
 
   function getAllocationHistory() {
     try {
@@ -998,3 +1038,78 @@ function saveAllocation(form) {
     } catch(e) { return dateStr; }
   }
 //สิ้นสุด function จัดสรรงบประมาณ
+
+// 📌 ฟังก์ชันแก้ไขรายการเบิกจ่าย (Recalculate Master + Update Log + Reason Col X)
+// 📌 [UPDATE v2] editTransaction: อัปเดตยอดคงเหลือใหม่ลง Column Y ด้วย
+function editTransaction(form) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    
+    var tSheet = ss.getSheetByName('t_actionplan');
+    var mSheet = ss.getSheetByName('m_actionplan');
+    
+    if (!tSheet || !mSheet) return { status: 'error', message: 'ไม่พบ Sheet ข้อมูล' };
+
+    // 1. เตรียมข้อมูล
+    var tRow = parseInt(form.rowId);
+    var checkID = tSheet.getRange(tRow, 2).getValue(); 
+    if (String(checkID) != String(form.projectId)) {
+        return { status: 'error', message: 'ข้อมูลไม่ตรงกัน โปรดรีเฟรช' };
+    }
+
+    // 2. คำนวณและอัปเดต Master (ก่อน) เพื่อให้ได้ยอดคงเหลือที่แท้จริง
+    var mData = mSheet.getDataRange().getValues();
+    var mRowIndex = -1;
+    var targetId = String(form.projectId).trim();
+
+    for (var i = 1; i < mData.length; i++) {
+      if (String(mData[i][0]).trim() === targetId) {
+        mRowIndex = i + 1;
+        break;
+      }
+    }
+
+    var newBalance = 0; // ตัวแปรเก็บยอดคงเหลือใหม่
+
+    if (mRowIndex !== -1) {
+       var cellSpent = mSheet.getRange(mRowIndex, 18); // Col R
+       var cellAlloc = mSheet.getRange(mRowIndex, 17); // Col Q
+       var cellBalance = mSheet.getRange(mRowIndex, 20); // Col T
+
+       var currentSpent = parseFloat(String(cellSpent.getValue()).replace(/,/g,'')) || 0;
+       var allocated = parseFloat(String(cellAlloc.getValue()).replace(/,/g,'')) || 0;
+
+       var oldVal = parseFloat(form.oldAmount) || 0;
+       var newVal = parseFloat(form.newAmount) || 0;
+
+       // คำนวณยอดเบิกจ่ายสะสมใหม่
+       var newSpentTotal = currentSpent - oldVal + newVal;
+       
+       // 🔥 คำนวณยอดคงเหลือใหม่ (Allocated - NewSpent)
+       newBalance = allocated - newSpentTotal;
+
+       // อัปเดต Master
+       cellSpent.setValue(newSpentTotal);
+       cellBalance.setValue(newBalance);
+    }
+
+    // 3. อัปเดต Log (t_actionplan)
+    // แก้ข้อมูลเดิม (เงิน, วันที่, รายละเอียด, เหตุผล)
+    tSheet.getRange(tRow, 16).setValue(form.newAmount); // Col P
+    tSheet.getRange(tRow, 18).setValue(form.date);      // Col R
+    tSheet.getRange(tRow, 20).setValue(form.desc);      // Col T
+    tSheet.getRange(tRow, 24).setValue(form.reason);    // Col X (เหตุผล)
+    
+    // ✅ อัปเดตยอดคงเหลือใหม่ลง Column Y (Index 25)
+    tSheet.getRange(tRow, 25).setValue(newBalance);
+
+  return { status: 'success', message: 'แก้ไขเรียบร้อย' };
+
+  } catch (e) {
+    return { status: 'error', message: 'System Error: ' + e.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
