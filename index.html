@@ -38,13 +38,13 @@
 
               <li>
                   <a class="dropdown-item" href="javascript:void(0)" onclick="switchPage('transaction')">
-                    <i class="fas fa-file-invoice-dollar me-2 text-success"></i>บันทึกรายการเบิกจ่าย
+                    <i class="fas fa-file-invoice-dollar me-2 text-success"></i>รายการเบิกจ่าย
                   </a>
               </li>
 
               <li>
                   <a class="dropdown-item" href="javascript:void(0)" onclick="switchPage('loan')">
-                    <i class="fas fa-hand-holding-usd me-2 text-primary"></i>บันทึกรายการเงินยืม
+                    <i class="fas fa-hand-holding-usd me-2 text-primary"></i>รายการเงินยืม
                   </a>
               </li>
 
@@ -263,11 +263,18 @@
                                               <label class="form-label small fw-bold text-muted">ลำดับโครงการ</label>
                                               <select id="txOrder" class="form-select select2" style="width:100%"></select>
                                           </div>
+                                          
                                           <div class="col-md-9">
+                                              <label class="form-label small fw-bold text-muted">โครงการ</label>
+                                              <select id="txProject" class="form-select select2" style="width:100%" disabled></select>
+                                          </div>
+
+                                          <div class="col-md-6">
                                               <label class="form-label small fw-bold text-muted">กิจกรรมหลัก</label>
                                               <select id="txActivity" class="form-select select2" style="width:100%" disabled></select>
                                           </div>
-                                          <div class="col-12 d-none" id="divTxSubActivity">
+                                          
+                                          <div class="col-md-6 d-none" id="divTxSubActivity">
                                               <label class="form-label small fw-bold text-muted">กิจกรรมย่อย</label>
                                               <select id="txSubActivity" class="form-select select2" style="width:100%" onchange="showTxBudgetInfo()"></select>
                                           </div>
@@ -276,10 +283,10 @@
                                       <div id="txInfoBox" class="alert alert-primary border-0 shadow-sm d-none mt-3 mb-0" role="alert">
                                           <div class="d-flex align-items-center justify-content-between">
                                               <div>
-                                                  <div class="small opacity-75">โครงการ</div>
-                                                  <div class="fw-bold text-truncate" style="max-width: 350px;" id="tx_disp_proj">...</div>
+                                                  <div class="small opacity-75">โครงการ <span id="tx_disp_dept" class="badge bg-white text-dark ms-2"></span></div>
+                                                  <div class="fw-bold text-wrap mt-1" style="font-size: 0.95rem;" id="tx_disp_proj">...</div>
                                               </div>
-                                              <div class="text-end">
+                                              <div class="text-end ps-3 border-start border-primary border-opacity-25 ms-3">
                                                   <div class="small opacity-75">งบคงเหลือ (บาท)</div>
                                                   <div class="h4 mb-0 fw-bold text-primary" id="tx_bal">0.00</div>
                                                   <small class="text-muted">จากจัดสรร <span id="tx_alloc">0</span></small>
@@ -317,12 +324,20 @@
                                                   <label>📑 หมวดรายจ่าย</label>
                                               </div>
                                           </div>
+
                                           <div class="col-md-6">
                                               <div class="form-floating">
                                                   <input type="text" class="form-control" id="txDesc" placeholder="รายละเอียด">
                                                   <label>📝 รายละเอียด (ถ้ามี)</label>
                                               </div>
                                           </div>
+                                          <div class="col-12">
+                                              <div class="form-floating">
+                                                  <input type="text" class="form-control" id="txRemark" placeholder="หมายเหตุ">
+                                                  <label class="text-secondary">📌 หมายเหตุ (บันทึกลง Col U)</label>
+                                              </div>
+                                          </div>
+
                                       </div>
                                   </div>
                               </div>
@@ -697,6 +712,53 @@
               </div>
           </div>
         </div>
+
+        <!-- Modal Edit เบิกจ่าย -->
+        <div class="modal fade" id="modalEditTx" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog">
+                <div class="modal-content rounded-4 shadow">
+                    <div class="modal-header bg-warning bg-opacity-10">
+                        <h5 class="modal-title text-dark"><i class="fas fa-edit me-2"></i>แก้ไขรายการเบิกจ่าย</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="formEditTx" onsubmit="submitEditTx(event)">
+                            <input type="hidden" id="editRowId">
+                            <input type="hidden" id="editProjectId">
+                            <input type="hidden" id="editOldAmount">
+
+                            <div class="mb-3">
+                                <label class="form-label text-muted small">วันที่เบิกจ่าย</label>
+                                <input type="date" class="form-control" id="editDate" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label text-muted small">รายละเอียด</label>
+                                <input type="text" class="form-control" id="editDesc" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">จำนวนเงิน (บาท)</label>
+                                <input type="number" step="0.01" class="form-control text-end text-primary fw-bold fs-4" id="editAmount" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-danger">เหตุผลในการแก้ไข *</label>
+                                <textarea class="form-control bg-light" id="editReason" rows="2" placeholder="ระบุสาเหตุที่ต้องแก้ไขยอดเงินหรือรายละเอียด..." required></textarea>
+                            </div>
+
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-warning text-dark fw-bold">
+                                    <i class="fas fa-save me-2"></i>บันทึกการแก้ไข
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Modal Edit เบิกจ่าย -->
+
 
     <?!= include('js'); ?>
   </body>
