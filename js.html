@@ -38,6 +38,14 @@
         theme: 'bootstrap-5', placeholder: '-- เลือกลำดับ --', allowClear: true,
         dropdownParent: $('#txModal') 
     });
+
+    $('#txProject').select2({ 
+        theme: 'bootstrap-5', placeholder: '-- เลือกโครงการ --', allowClear: true,
+        dropdownParent: $('#txModal'),
+        templateResult: formatState, templateSelection: formatState
+    });
+    $('#txProject').on('change select2:select', function(e) { onTxProjectChange(); });
+
     $('#txActivity').select2({ 
         theme: 'bootstrap-5', placeholder: '-- เลือกกิจกรรม --', allowClear: true,
         dropdownParent: $('#txModal') 
@@ -210,182 +218,183 @@
   }
 
   // ==========================================
-  // 5. TRANSACTION LOGIC
+  // 5. TRANSACTION LOGIC (Fixed Cascading)
   // ==========================================
+
+  function clearTxForm() { 
+      $('#txProject').empty().append('<option value="">-- เลือกโครงการ --</option>').trigger('change').prop('disabled', true);
+      $('#txActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>').trigger('change').prop('disabled', true); 
+      $('#txSubActivity').empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>').trigger('change').prop('disabled', true);
+      $('#divTxSubActivity').addClass('d-none'); 
+      $('#txInfoBox').addClass('d-none'); 
+  }
+
   function onTxOrderChange() { 
       var order = $('#txOrder').val(); 
-      var select = $('#txActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>'); 
+      var projSel = $('#txProject').empty().append('<option value="">-- เลือกโครงการ --</option>');
+      
+      $('#txActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>').trigger('change').prop('disabled', true);
+      $('#txSubActivity').empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>').trigger('change').prop('disabled', true);
       $('#divTxSubActivity').addClass('d-none'); 
-      $('#txSubActivity').empty(); 
       $('#txInfoBox').addClass('d-none'); 
       
       if(!order) { 
-          select.trigger('change').prop('disabled', true); 
+          projSel.trigger('change').prop('disabled', true); 
           return; 
       } 
       
       var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order)); 
       if (rows.length > 0) { 
-          $('#tx_disp_proj').text(rows[0].project).removeClass('text-truncate').addClass('text-wrap').css('font-size', '0.9rem'); 
-          $('#tx_disp_dept').text(rows[0].dept); 
-          $('#txProjectInfo').removeClass('d-none');
-          var activities = [...new Set(rows.map(r => r.activity))].sort(); 
-          activities.forEach(act => { select.append(`<option value="${act}">${act}</option>`); }); 
-          select.trigger('change').prop('disabled', false); 
+          var projects = [...new Set(rows.map(r => r.project))].sort();
+          projects.forEach(p => { projSel.append(new Option(p, p)); });
+          projSel.trigger('change').prop('disabled', false); 
       } 
+  }
+
+  function onTxProjectChange() {
+      var order = $('#txOrder').val(); 
+      var proj = $('#txProject').val();
+      var actSel = $('#txActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>');
+      
+      $('#txSubActivity').empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>').trigger('change').prop('disabled', true);
+      $('#divTxSubActivity').addClass('d-none'); 
+      $('#txInfoBox').addClass('d-none');
+      
+      if(!proj) {
+          actSel.trigger('change').prop('disabled', true);
+          return;
+      }
+
+      var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order) && r.project === proj);
+      if(rows.length > 0) {
+          var activities = [...new Set(rows.map(r => r.activity))].sort();
+          activities.forEach(a => { actSel.append(new Option(a, a)); });
+          actSel.trigger('change').prop('disabled', false);
+      }
   }
 
   function onTxActivityChange() { 
       var order = $('#txOrder').val(); 
-      var actName = $('#txActivity').val(); 
-      var subSelect = $('#txSubActivity').empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>'); 
+      var proj = $('#txProject').val();
+      var act = $('#txActivity').val(); 
+      var subSel = $('#txSubActivity').empty().append('<option value="">-- เลือกกิจกรรมย่อย --</option>'); 
+      
       $('#divTxSubActivity').addClass('d-none'); 
       $('#txInfoBox').addClass('d-none'); 
       
-      if (!actName) return; 
-      var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order) && r.activity === actName); 
-      var subActivities = rows.filter(r => r.subActivity).map(r => r.subActivity); 
+      if (!act) return; 
+      
+      var rows = CACHED_OPTIONS.filter(r => String(r.order) === String(order) && r.project === proj && r.activity === act); 
+      var subActivities = [...new Set(rows.map(r => r.subActivity).filter(s => s && String(s).trim() !== ""))].sort();
       
       if (subActivities.length > 0) { 
-          subActivities.forEach(sub => { 
-              var row = rows.find(r => r.subActivity === sub); 
-              subSelect.append(`<option value="${sub}" data-id="${row.id}" data-alloc="${row.allocated}" data-bal="${row.balance}" data-proj="${row.project}" data-dept="${row.dept}" data-order="${row.order}">${sub}</option>`); 
-          }); 
-          $('#divTxSubActivity').removeClass('d-none'); 
+          subActivities.forEach(sub => { subSel.append(new Option(sub, sub)); }); 
+          $('#divTxSubActivity').removeClass('d-none');
+          subSel.prop('disabled', false);
       } else { 
-          var row = rows[0]; if (row) updateTxInfoBox(row.allocated, row.balance, row.id); 
+          showTxBudgetInfo(); // ถ้าไม่มีกิจกรรมย่อย ให้โชว์ InfoBox ทันที
       } 
   }
 
   function showTxBudgetInfo() { 
-      var opt = $('#txSubActivity option:selected'); 
-      if (opt.val()) updateTxInfoBox(opt.data('alloc'), opt.data('bal'), opt.data('id')); 
+      var order = $('#txOrder').val(); 
+      var proj = $('#txProject').val(); 
+      var act = $('#txActivity').val(); 
+      var sub = $('#txSubActivity').val(); 
+      
+      // ค้นหาแถว Master ที่ตรงกับเงื่อนไขทั้งหมด
+      var row = CACHED_OPTIONS.find(r => 
+          String(r.order) === String(order) && 
+          r.project === proj && 
+          r.activity === act && 
+          (sub ? r.subActivity === sub : true)
+      );
+
+      if (row) {
+          $('#tx_disp_dept').text(row.dept); // แสดงกลุ่มงาน
+          $('#tx_disp_proj').text(row.project); 
+          
+          $('#tx_alloc').text(Number(row.allocated).toLocaleString()); 
+          var pct = (row.allocated > 0) ? (row.balance / row.allocated * 100) : 0;
+          var colorClass = (pct < 20) ? 'text-danger' : (pct < 50 ? 'text-success' : 'text-primary');
+          $('#tx_bal').text(Number(row.balance).toLocaleString()).removeClass('text-primary text-danger text-success text-warning').addClass(colorClass); 
+          
+          $('#txInfoBox').attr('data-id', row.id).removeClass('d-none'); 
+      }
   }
 
-  function updateTxInfoBox(alloc, bal, id) { 
-      $('#tx_alloc').text(Number(alloc).toLocaleString()); 
-      var pct = (alloc > 0) ? (bal / alloc * 100) : 0;
-      var colorClass = (pct < 20) ? 'text-danger' : (pct < 50 ? 'text-success' : 'text-primary');
-      $('#tx_bal').text(Number(bal).toLocaleString()).removeClass('text-primary text-danger text-success text-warning').addClass(colorClass); 
-      $('#txInfoBox').attr('data-id', id).removeClass('d-none'); 
-  }
+function openEditTxModal(rowId, dateStr, amount, desc, projectName, projectId) {
+    $('#editRowId').val(rowId);
+    $('#editProjectId').val(projectId); // รหัสโครงการสำคัญมากสำหรับการคำนวณ Master
+    $('#editOldAmount').val(amount);    // เก็บยอดเก่าไว้หักลบ
+    
+    $('#editDesc').val(desc);
+    $('#editAmount').val(amount);
+    $('#editReason').val(''); // ล้างเหตุผล
+    
+    // แปลงวันที่ไทย/Format อื่น ให้เป็น YYYY-MM-DD เพื่อใส่ใน Input Date
+    // (สมมติว่า dateStr มาเป็น text ถ้า format ไม่ตรงอาจต้องเขียน function แปลง)
+    // เบื้องต้นลองกำหนดค่าว่างเพื่อให้ user เลือกใหม่ หรือถ้า dateStr เป็น YYYY-MM-DD อยู่แล้วก็ใส่ได้เลย
+    // $('#editDate').val(dateStr); 
+    document.getElementById('editDate').valueAsDate = new Date(); // default วันนี้ไปก่อน
 
-  function clearTxForm() { 
-      $('#txActivity').empty().append('<option value="">-- เลือกกิจกรรม --</option>').trigger('change').prop('disabled', true); 
-      $('#divTxSubActivity').addClass('d-none'); 
-      $('#txInfoBox').addClass('d-none'); 
-      $('#txProjectInfo').addClass('d-none');
-  }
+    var myModal = new bootstrap.Modal(document.getElementById('modalEditTx'));
+    myModal.show();
+}
 
-  function openTxModal() {
-      $('#txForm')[0].reset();
-      clearTxForm(); 
-      $('#txOrder').val(null).trigger('change'); 
-      document.getElementById('txDate').valueAsDate = new Date(); 
-      new bootstrap.Modal(document.getElementById('txModal')).show();
-  }
+// 2. บันทึกการแก้ไข
+function submitEditTx(e) {
+    e.preventDefault();
+    
+    var rowId = $('#editRowId').val();
+    var projectId = $('#editProjectId').val();
+    var oldAmount = $('#editOldAmount').val();
+    var newAmount = $('#editAmount').val();
+    var newDate = $('#editDate').val();
+    var newDesc = $('#editDesc').val();
+    var reason = $('#editReason').val();
 
-  function loadTxHistory() { 
-      $('#txHistoryTable').html('<tr><td colspan="6" class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-success"></i><div class="mt-2 text-muted">กำลังโหลดข้อมูล...</div></td></tr>'); 
-      google.script.run.withSuccessHandler(renderTxTable).getTransactionHistory(); 
-  }
-
-  function renderTxTable(rows) {
-    // 1. ล้างค่า DataTables เดิม
-    if ($.fn.DataTable.isDataTable('#tableTxHistoryNew')) { 
-        $('#tableTxHistoryNew').DataTable().destroy(); 
-    }
-
-    var tbody = $('#txHistoryTable'); 
-    tbody.empty();
-
-    // 2. ถ้าไม่มีข้อมูล
-    if (!rows || rows.length === 0) {
-        // ⚠️ [แก้ไข] ปรับ colspan เป็น 9 (เพราะเพิ่มมา 3 คอลัมน์)
-        tbody.append('<tr><td colspan="9" class="text-center py-5 text-muted"><i class="fas fa-inbox fa-3x mb-3 opacity-25"></i><br>ยังไม่มีรายการเบิกจ่าย</td></tr>');
-        return;
-    }
-
-    // 3. วนลูปสร้างแถว
-    rows.forEach(r => {
-        // จัดการ Badge แหล่งเงิน
-        var sourceBadge = (r.source && (r.source.includes('Non') || r.source.includes('นอก'))) 
-            ? '<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 ms-1">Non-MOPH</span>' 
-            : '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1">MOPH</span>';
-        
-        var dateShow = `<div class="fw-bold text-primary" style="font-size: 1rem;">${r.date}</div>`;
-        
-        // ฟอร์แมตตัวเลข (ใส่ลูกน้ำ)
-        var amountShow = Number(r.amount).toLocaleString();
-        
-        // ✅ [เพิ่ม] ตัวแปรสำหรับ 3 คอลัมน์ใหม่จาก Master (กันเหนียวถ้าค่าเป็น null ให้โชว์ 0)
-        var masterAlloc = Number(r.masterAllocated || 0).toLocaleString();
-        var masterSpent = Number(r.masterSpent || 0).toLocaleString();
-        var masterBal   = Number(r.masterBalance || 0).toLocaleString();
-
-        tbody.append(`
-            <tr>
-                <td class="ps-4 text-center text-muted fw-bold">${r.order || '-'}</td>
-                
-                <td class="text-center text-nowrap">${dateShow}</td> 
-                
-                <td>
-                    <div class="fw-bold text-dark text-wrap" style="line-height: 1.4;">${r.project}</div>
-                    <div class="small text-muted text-wrap mt-1">${r.activity || ''}</div>
-                </td>
-                
-                <td>
-                    <div class="text-wrap text-muted small" style="line-height: 1.4;">${r.desc || '-'}</div>
-                    <div class="mt-1">
-                        <span class="badge bg-secondary fw-normal">${r.type || '-'}</span> ${sourceBadge}
-                    </div>
-                </td>
-                
-                <td class="text-end pe-4">
-                    <span class="h6 fw-bold text-dark mb-0">${amountShow}</span>
-                </td>
-
-                <td class="text-end text-dark bg-light bg-opacity-25">
-                    ${masterAlloc}
-                </td>
-
-                <td class="text-end text-success bg-light bg-opacity-25">
-                    ${masterSpent}
-                </td>
-
-                <td class="text-end text-primary fw-bold bg-light bg-opacity-50">
-                    ${masterBal}
-                </td>
-                <td class="text-center">
-                    <div class="d-flex justify-content-center gap-1">
-                        <button class="btn btn-sm btn-light text-warning hover-warning" title="แก้ไข" onclick="confirmTxAction('edit', '${r.rowId}')">
-                            <i class="fas fa-pen"></i>
-                        </button>
-                        <button class="btn btn-sm btn-light text-danger hover-danger" title="ลบรายการ" onclick="confirmTxAction('delete', '${r.rowId}')">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `);
-    });
-
-    // 4. สร้าง DataTable ใหม่
-    $('#tableTxHistoryNew').DataTable({ 
-        "pageLength": 10, 
-        "lengthChange": false, 
-        "searching": true, 
-        "language": { 
-            "search": "ค้นหา:", 
-            "paginate": { "next": ">", "previous": "<" }, 
-            "emptyTable": "ไม่พบข้อมูล",
-            "info": "แสดง _START_ ถึง _END_ จาก _TOTAL_ รายการ"
-        }, 
-        "order": [] 
+    Swal.fire({
+        title: 'ยืนยันการแก้ไข?',
+        text: "ระบบจะคำนวณยอดเงินใน Master ใหม่ทันที",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ffc107',
+        confirmButtonText: 'ใช่, บันทึกเลย',
+        cancelButtonText: 'ยกเลิก'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({ title: 'กำลังประมวลผล...', didOpen: () => Swal.showLoading() });
+            
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    Swal.close();
+                    if (res.status === 'success') {
+                        Swal.fire('สำเร็จ', 'แก้ไขข้อมูลเรียบร้อย', 'success');
+                        $('#modalEditTx').modal('hide');
+                        // Refresh ตาราง
+                        loadTxHistory(); 
+                        refreshMasterData(); 
+                        loadDashboardData();
+                    } else {
+                        Swal.fire('Error', res.message, 'error');
+                    }
+                })
+                .editTransaction({
+                    rowId: rowId,
+                    projectId: projectId,
+                    oldAmount: oldAmount,
+                    newAmount: newAmount,
+                    date: newDate,
+                    desc: newDesc,
+                    reason: reason
+                });
+        }
     });
 }
 
-  function confirmTxAction(action, id) {
+
+ function confirmTxAction(action, id) {
       if (action === 'delete') {
           Swal.fire({ title: 'ยืนยันการลบ?', text: `ต้องการลบรายการลำดับที่ ${id} ใช่หรือไม่?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'ยืนยันลบ', cancelButtonText: 'ยกเลิก' }).then((res) => { if (res.isConfirmed) Swal.fire('แจ้งเตือน', 'ระบบลบข้อมูลจำลองเรียบร้อย', 'success'); });
       } else if (action === 'edit') {
@@ -400,11 +409,17 @@
       if(!projectId) { Swal.fire('เตือน','กรุณาเลือกโครงการ','warning'); return; }
 
       var formData = { 
-          projectId: projectId, dept: $('#tx_disp_dept').text(), project: $('#tx_disp_proj').text(), 
-          activity: $('#txActivity').val(), txDate: $('#txDate').val(), amount: amount, 
-          expenseType: $('#txExpenseType').val(), desc: $('#txDesc').val() 
+          projectId: projectId, 
+          dept: $('#tx_disp_dept').text(), 
+          project: $('#tx_disp_proj').text(), 
+          activity: $('#txActivity').val(), 
+          txDate: $('#txDate').val(), 
+          amount: amount, 
+          expenseType: $('#txExpenseType').val(), 
+          desc: $('#txDesc').val(), 
+          remark: $('#txRemark').val()
       }; 
-
+      
       $('#btnSaveTx').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>กำลังบันทึก...'); 
       google.script.run.withSuccessHandler(function(res) { 
           $('#btnSaveTx').prop('disabled', false).html('<i class="fas fa-save me-2"></i>บันทึกข้อมูล'); 
@@ -415,6 +430,104 @@
           } 
       }).saveTransaction(formData); 
   }
+
+  // ==========================================
+// 📌 ส่วนที่หายไป: ฟังก์ชันสำหรับหน้าเบิกจ่าย
+// ==========================================
+
+// 1. เปิด Modal บันทึกรายการใหม่
+function openTxModal() {
+    $('#txForm')[0].reset();
+    clearTxForm(); 
+    $('#txRemark').val(''); 
+    $('#txOrder').val(null).trigger('change'); 
+    document.getElementById('txDate').valueAsDate = new Date(); 
+    new bootstrap.Modal(document.getElementById('txModal')).show();
+}
+
+// 2. โหลดประวัติการเบิกจ่าย
+function loadTxHistory() {
+    $('#txHistoryTable').html('<tr><td colspan="8" class="text-center py-5 text-muted"><i class="fas fa-spinner fa-spin me-2"></i>กำลังโหลดข้อมูล...</td></tr>');
+    
+    google.script.run.withSuccessHandler(function(rows) {
+        renderTxTable(rows);
+    }).getTransactionHistory();
+}
+
+// 3. แสดงตารางประวัติการเบิกจ่าย
+function renderTxTable(rows) {
+    if ($.fn.DataTable.isDataTable('#tableTxHistoryNew')) {
+        $('#tableTxHistoryNew').DataTable().destroy();
+    }
+
+    var tbody = $('#txHistoryTable');
+    tbody.empty();
+
+    if (!rows || rows.length === 0) {
+        tbody.append('<tr><td colspan="8" class="text-center py-5 text-muted">ไม่พบข้อมูลประวัติการเบิกจ่าย</td></tr>');
+        return;
+    }
+
+    rows.forEach(r => {
+        var amountShow = Number(r.amount).toLocaleString(undefined, {minimumFractionDigits: 2});
+        
+        // จัดการเรื่องยอด Master (ถ้าไม่มีให้แสดง -)
+        var masterAlloc = r.masterAllocated ? Number(r.masterAllocated).toLocaleString() : '-';
+        var masterSpent = r.masterSpent ? Number(r.masterSpent).toLocaleString() : '-';
+        var masterBal = r.masterBalance ? Number(r.masterBalance).toLocaleString() : '-';
+
+        tbody.append(`
+            <tr>
+                <td class="text-center text-muted small fw-bold">${r.order}</td>
+                <td class="text-nowrap small">${r.date}</td>
+                <td>
+                    <div class="fw-bold text-dark text-wrap" style="font-size: 0.95rem;">${r.project}</div>
+                    <div class="small text-muted text-wrap mt-1"><i class="fas fa-angle-right me-1"></i>${r.activity}</div>
+                </td>
+                
+                <td>
+                    <div class="text-wrap small text-secondary mb-1">${r.desc || '-'}</div>
+                    <span class="badge bg-secondary bg-opacity-25 text-dark border">${r.type || ''}</span>
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1">${r.source || ''}</span>
+                </td>
+
+                <td class="text-end pe-4">
+                    <span class="h6 fw-bold text-dark mb-0">${amountShow}</span>
+                </td>
+
+                <td class="text-end text-primary bg-light bg-opacity-25 small">${masterAlloc}</td>
+                <td class="text-end text-warning text-opacity-75 bg-light bg-opacity-25 small">${masterSpent}</td>
+                <td class="text-end text-success fw-bold bg-light bg-opacity-50">${masterBal}</td>
+
+                <td class="text-center">
+                   <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-light text-warning hover-warning border-0" title="แก้ไข" 
+                            onclick="openEditTxModal('${r.rowId}', '${r.date}', '${r.amount}', '${r.desc}', '${r.project}', '${r.id}')">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button class="btn btn-sm btn-light text-danger hover-danger border-0" title="ลบรายการ" 
+                            onclick="confirmTxAction('delete', '${r.rowId}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                   </div>
+                </td>
+            </tr>
+        `);
+    });
+
+    $('#tableTxHistoryNew').DataTable({
+        "pageLength": 10,
+        "lengthChange": false,
+        "searching": true,
+        "ordering": false,
+        "language": {
+            "search": "ค้นหา:",
+            "paginate": { "next": ">", "previous": "<" },
+            "emptyTable": "ไม่พบข้อมูล",
+            "info": "แสดง _START_ ถึง _END_ จาก _TOTAL_ รายการ"
+        }
+    });
+}
 
   // ==========================================
   // 6. LOAN FUNCTIONS (Clean & Complete)
