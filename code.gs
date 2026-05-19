@@ -3,7 +3,7 @@
 // ==========================================
 var SPREADSHEET_ID = '1BhZDqEU7XKhgYgYnBrbFI7IMbr_SLdhU8rvhAMddodQ';
 var SHEET_NAME = 'm_actionplan';
-var APP_VERSION = 'Version : 690505';
+var APP_VERSION = 'Version : 690514';
 
 // ==========================================
 // 📌 1.1 DYNAMIC COLUMN MAPPING (อัปเดตเพิ่ม 3 คอลัมน์ใหม่)
@@ -164,19 +164,21 @@ function getAdminMasterPlan() {
     return getAllMasterDataForClient();
 }
 
-// ==========================================
-// 4. DASHBOARD DATA (Dynamic Column)
-// ==========================================
+// ==================
+// 4. DASHBOARD DATA 
+// ==================
 function getDashboardData() {
     try {
         var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
         var sheet = ss.getSheetByName(SHEET_NAME);
         if (!sheet) return { error: "ไม่พบ Sheet" };
 
-        var map = getColumnMap(sheet); // 🌟 ใช้ Map แทนตัวเลข
+        var map = getColumnMap(sheet);
         var summary = {
             moph: { approved: 0, allocated: 0, spent: 0, balance: 0, deptStats: {} },
-            loeiFund: { approved: 0, allocated: 0, spent: 0, balance: 0, deptStats: {} }
+            loeiFund: { approved: 0, allocated: 0, spent: 0, balance: 0, deptStats: {} },
+            hrd1: { approved: 0, allocated: 0, spent: 0, balance: 0 },
+            hrd2: { approved: 0, allocated: 0, spent: 0, balance: 0 }
         };
 
         var parseNum = (val) => { var v = parseFloat(String(val).replace(/,/g, '')); return isNaN(v) ? 0 : v; };
@@ -186,37 +188,60 @@ function getDashboardData() {
             var row = data[i];
             var typeVal = String(row[map[COL_NAME.TYPE]] || "").trim();
             var sourceVal = String(row[map[COL_NAME.SOURCE]] || "").trim();
+            var budgetCodeVal = String(row[map[COL_NAME.BUDGET_CODE]] || "").trim();
+            var actCodeVal = String(row[map[COL_NAME.ACT_CODE]] || "").trim();
             var statusVal = String(row[map[COL_NAME.STATUS]] || "").trim().toUpperCase();
             var dept = String(row[map[COL_NAME.DEPT]] || 'ไม่ระบุ').trim();
             if (dept === '') dept = 'ไม่ระบุ';
 
             if (statusVal === 'ACTIVE') {
-                var isOldNonMoph = (typeVal.indexOf('เงินนอก') > -1 || typeVal.indexOf('เงินบำรุง') > -1 || typeVal.indexOf('บริจาค') > -1 || typeVal.toUpperCase().indexOf('NON') > -1);
+                var approveAmt = parseNum(row[map[COL_NAME.APPROVE]]);
+                var allocAmt = parseNum(row[map[COL_NAME.ALLOC]]);
+                var spentAmt = parseNum(row[map[COL_NAME.SPENT]]);
+                var balAmt = parseNum(row[map[COL_NAME.BAL]]);
 
+                // 1. สป.สธ.
+                var isOldNonMoph = (typeVal.indexOf('เงินนอก') > -1 || typeVal.indexOf('เงินบำรุง') > -1 || typeVal.indexOf('บริจาค') > -1 || typeVal.toUpperCase().indexOf('NON') > -1);
                 if (!isOldNonMoph) {
-                    summary.moph.approved += parseNum(row[map[COL_NAME.APPROVE]]);
-                    summary.moph.allocated += parseNum(row[map[COL_NAME.ALLOC]]);
-                    summary.moph.spent += parseNum(row[map[COL_NAME.SPENT]]);
-                    summary.moph.balance += parseNum(row[map[COL_NAME.BAL]]);
+                    summary.moph.approved += approveAmt;
+                    summary.moph.allocated += allocAmt;
+                    summary.moph.spent += spentAmt;
+                    summary.moph.balance += balAmt;
 
                     if (!summary.moph.deptStats[dept]) summary.moph.deptStats[dept] = { allocated: 0, spent: 0 };
-                    summary.moph.deptStats[dept].allocated += parseNum(row[map[COL_NAME.ALLOC]]);
-                    summary.moph.deptStats[dept].spent += parseNum(row[map[COL_NAME.SPENT]]);
+                    summary.moph.deptStats[dept].allocated += allocAmt;
+                    summary.moph.deptStats[dept].spent += spentAmt;
                 }
 
+                // 2. เงินนอก สป. (เฉพาะ เงินบำรุง สสจ.เลย)
                 var cleanType = typeVal.replace(/\s+/g, '');
                 var cleanSource = sourceVal.replace(/\s+/g, '');
                 var isLoeiFund = (cleanType === 'เงินนอกสป.' && cleanSource === 'เงินบำรุงสสจ.เลย');
 
                 if (isLoeiFund) {
-                    summary.loeiFund.approved += parseNum(row[map[COL_NAME.APPROVE]]);
-                    summary.loeiFund.allocated += parseNum(row[map[COL_NAME.ALLOC]]);
-                    summary.loeiFund.spent += parseNum(row[map[COL_NAME.SPENT]]);
-                    summary.loeiFund.balance += parseNum(row[map[COL_NAME.BAL]]);
+                    summary.loeiFund.approved += approveAmt;
+                    summary.loeiFund.allocated += allocAmt;
+                    summary.loeiFund.spent += spentAmt;
+                    summary.loeiFund.balance += balAmt;
 
                     if (!summary.loeiFund.deptStats[dept]) summary.loeiFund.deptStats[dept] = { allocated: 0, spent: 0 };
-                    summary.loeiFund.deptStats[dept].allocated += parseNum(row[map[COL_NAME.ALLOC]]);
-                    summary.loeiFund.deptStats[dept].spent += parseNum(row[map[COL_NAME.SPENT]]);
+                    summary.loeiFund.deptStats[dept].allocated += allocAmt;
+                    summary.loeiFund.deptStats[dept].spent += spentAmt;
+                }
+
+                // 3. หมวด HRD 1 & 2
+                if (typeVal === 'เงินนอก สป.' && sourceVal === 'เงินบำรุง สสจ.เลย' && budgetCodeVal === 'เงินบำรุง สสจ.เลย (รพ.เลย)') {
+                    if (actCodeVal === 'เงินบำรุง สสจ.เลย (หมวด HRD)') {
+                        summary.hrd1.approved += approveAmt;
+                        summary.hrd1.allocated += allocAmt;
+                        summary.hrd1.spent += spentAmt;
+                        summary.hrd1.balance += balAmt;
+                    } else if (actCodeVal === 'HRD อบรมหลักสูตรต่างๆ') {
+                        summary.hrd2.approved += approveAmt;
+                        summary.hrd2.allocated += allocAmt;
+                        summary.hrd2.spent += spentAmt;
+                        summary.hrd2.balance += balAmt;
+                    }
                 }
             }
         }
@@ -343,16 +368,12 @@ function saveTransaction(payload) {
             return { success: false, message: 'ยอดเงินคงเหลือไม่เพียงพอสำหรับการเบิกจ่าย' };
         }
 
-        // 💾 3. อัปเดตตาราง Master (บวกยอดเบิกจ่าย, ลบยอดคงเหลือ)
-        sheetM.getRange(targetRow + 1, spentIndex + 1).setValue(currentSpent + amount);
-        sheetM.getRange(targetRow + 1, balIndex + 1).setValue(currentBal - amount);
-
-        // 📋 4. ดึงข้อมูล Year, Cat, Plan จากตาราง Master มาเติมให้สมบูรณ์
+        // 📋 3. ดึงข้อมูล Year, Cat, Plan จากตาราง Master มาเติมให้สมบูรณ์
         var mYear = map[COL_NAME.YEAR] !== undefined ? mData[targetRow][map[COL_NAME.YEAR]] : "";
         var mCat = map[COL_NAME.CAT] !== undefined ? mData[targetRow][map[COL_NAME.CAT]] : "";
         var mPlan = map[COL_NAME.PLAN] !== undefined ? mData[targetRow][map[COL_NAME.PLAN]] : "";
 
-        // 🎯 5. สร้าง Array แถวใหม่สำหรับตารางประวัติ (t_actionplan) โยนลงช่องให้เป๊ะ!
+        // 🎯 4. สร้าง Array แถวใหม่สำหรับตารางประวัติ (t_actionplan) โยนลงช่องให้เป๊ะ!
         var newRowT = [];
         newRowT.length = 30; // จองพื้นที่ว่างไว้ 30 คอลัมน์กันเหนียว
         newRowT.fill('');
@@ -379,9 +400,15 @@ function saveTransaction(payload) {
         newRowT[25] = formatToStorageDate(payload.startDate) || ''; // Z: เริ่มดำเนินการ (สำหรับ Gantt)
         newRowT[26] = formatToStorageDate(payload.endDate) || '';   // AA: สิ้นสุดดำเนินการ (สำหรับ Gantt)
 
-        // 🚀 6. บันทึกประวัติและปลดล็อค
+        // 🚀 5. บันทึกประวัติก่อนเป็นลำดับแรก (Atomic Transaction Step 1)
         sheetT.appendRow(newRowT);
         SpreadsheetApp.flush();
+
+        // 💾 6. อัปเดตตาราง Master (บวกยอดเบิกจ่าย, ลบยอดคงเหลือ) หลังจากประวัติบันทึกสำเร็จ (Atomic Transaction Step 2)
+        sheetM.getRange(targetRow + 1, spentIndex + 1).setValue(currentSpent + amount);
+        sheetM.getRange(targetRow + 1, balIndex + 1).setValue(currentBal - amount);
+        SpreadsheetApp.flush();
+        
         lock.releaseLock();
 
         return { success: true, count: 1 };
@@ -401,10 +428,25 @@ function deleteTransaction(rowIndex, projectId, amount) {
         var sheetT = ss.getSheetByName('t_actionplan');
         var sheetM = ss.getSheetByName('m_actionplan');
 
-        // 1. ตรวจสอบว่าแถวที่จะลบในประวัติ มีรหัสโครงการตรงกันหรือไม่ (ป้องกันการลบผิดแถว)
-        var tProj = String(sheetT.getRange(rowIndex, 2).getValue()).trim();
-        if (tProj !== String(projectId).trim()) {
-            return { success: false, message: 'ข้อมูลไม่ตรงกัน ไม่สามารถลบได้ (อาจมีการเปลี่ยนแปลงข้อมูลก่อนหน้า โปรดรีเฟรช)' };
+        var tData = sheetT.getDataRange().getValues();
+        var targetRowT = -1;
+        
+        var paramProjectId = String(projectId).trim();
+        var paramAmount = Number(amount) || 0;
+
+        // 1. ค้นหาแถวที่ต้องการลบในประวัติ จากล่างขึ้นบนเพื่อความแม่นยำ ป้องกันแถวเคลื่อน
+        for (var j = tData.length - 1; j >= 1; j--) {
+            var recProj = String(tData[j][1]).trim(); // B: รหัสโครงการ
+            var recAmt = Number(tData[j][15]) || 0;   // P: ยอดเบิกจ่าย
+
+            if (recProj === paramProjectId && Math.abs(recAmt - paramAmount) < 0.01) {
+                targetRowT = j + 1;
+                break;
+            }
+        }
+
+        if (targetRowT === -1) {
+            return { success: false, message: 'ข้อมูลไม่ตรงกัน ไม่สามารถลบได้ (ไม่พบประวัติ หรือมีการเปลี่ยนแปลงข้อมูลก่อนหน้า โปรดรีเฟรช)' };
         }
 
         // 2. หายอดเงินของโครงการนั้น เพื่อดึงเงินคืนกลับเข้ากระเป๋า
@@ -413,7 +455,7 @@ function deleteTransaction(rowIndex, projectId, amount) {
         var targetRowM = -1;
 
         for (var i = 1; i < mData.length; i++) {
-            if (String(mData[i][map[COL_NAME.ID]]).trim() === String(projectId).trim()) {
+            if (String(mData[i][map[COL_NAME.ID]]).trim() === paramProjectId) {
                 targetRowM = i + 1;
                 break;
             }
@@ -425,18 +467,17 @@ function deleteTransaction(rowIndex, projectId, amount) {
 
             var currentSpent = Number(sheetM.getRange(targetRowM, spentIdx).getValue()) || 0;
             var currentBal = Number(sheetM.getRange(targetRowM, balIdx).getValue()) || 0;
-            var refundAmount = Number(amount) || 0;
 
-            var newSpent = currentSpent - refundAmount;
+            var newSpent = currentSpent - paramAmount;
             if (newSpent < 0) newSpent = 0; // กันติดลบ
 
-            // 🎯 คำนวณให้เสร็จสรรพใน Script ไม่ต้องง้อสูตรในชีต!
+            // 🎯 คืนยอดลง Master
             sheetM.getRange(targetRowM, spentIdx).setValue(newSpent);
-            sheetM.getRange(targetRowM, balIdx).setValue(currentBal + refundAmount);
+            sheetM.getRange(targetRowM, balIdx).setValue(currentBal + paramAmount);
         }
 
-        // 3. ลบแถวประวัติทิ้ง
-        sheetT.deleteRow(rowIndex);
+        // 3. ลบแถวประวัติทิ้งเมื่อการค้นหาตรงเงื่อนไข
+        sheetT.deleteRow(targetRowT);
 
         SpreadsheetApp.flush();
         return { success: true };
@@ -633,8 +674,8 @@ function updateLoanRepayment(data) {
                     var cellSpent = mSheet.getRange(mRowIndex, colSpent);
                     var currentSpent = parseFloat(cellSpent.getValue()) || 0;
                     var updatedSpent = currentSpent + payAmount;
-                    // var updatedBalance = allocated - updatedSpent;
-                    // cellSpent.setValue(updatedSpent);
+                    var updatedBalance = allocated - updatedSpent;
+                    cellSpent.setValue(updatedSpent);
                     mSheet.getRange(mRowIndex, colBalance).setValue(updatedBalance);
                 }
             }
@@ -655,8 +696,9 @@ function getTransactionHistory() {
         if (!tSheet) return [];
         var mSheet = ss.getSheetByName('m_actionplan');
         var masterMap = {};
+        
         if (mSheet) {
-            var map = getColumnMap(mSheet); // 🌟 FIX: ใช้ Dynamic Column Map แทน hardcoded index
+            var map = getColumnMap(mSheet); 
             var mData = mSheet.getDataRange().getValues();
             for (var i = 1; i < mData.length; i++) {
                 var pid = String(mData[i][map[COL_NAME.ID]]).trim();
@@ -672,26 +714,39 @@ function getTransactionHistory() {
         }
         var data = tSheet.getDataRange().getDisplayValues();
         if (data.length < 2) return [];
+        var headers = data[0];
+        
+        var colProjId = headers.indexOf(COL_NAME.ID) > -1 ? headers.indexOf(COL_NAME.ID) : 1;
+        var colOrder = headers.indexOf(COL_NAME.ORDER) > -1 ? headers.indexOf(COL_NAME.ORDER) : 4;
+        var colProj = headers.indexOf(COL_NAME.PROJ) > -1 ? headers.indexOf(COL_NAME.PROJ) : 7;
+        var colAct = headers.indexOf(COL_NAME.ACT) > -1 ? headers.indexOf(COL_NAME.ACT) : 8;
+        var colSub = headers.indexOf(COL_NAME.SUB) > -1 ? headers.indexOf(COL_NAME.SUB) : 9;
+        var colSource = headers.indexOf(COL_NAME.SOURCE) > -1 ? headers.indexOf(COL_NAME.SOURCE) : 11;
+        var colAmount = headers.indexOf('ยอดเบิกจ่าย') > -1 ? headers.indexOf('ยอดเบิกจ่าย') : 15;
+        var colDate = headers.indexOf('วันที่เบิกจ่าย') > -1 ? headers.indexOf('วันที่เบิกจ่าย') : 17;
+        var colExpType = headers.indexOf('หมวดรายจ่าย') > -1 ? headers.indexOf('หมวดรายจ่าย') : 18;
+        var colDesc = headers.indexOf('รายละเอียด/หมายเหตุ') > -1 ? headers.indexOf('รายละเอียด/หมายเหตุ') : 19;
+
         var result = [];
         var parseAmount = function (v) { return parseFloat(String(v).replace(/,/g, '')) || 0; };
 
         for (var i = data.length - 1; i >= 1; i--) {
             var row = data[i];
-            if (!row || (!row[0] && !row[1])) continue;
-            var projId = String(row[1]).trim();
+            if (!row || (!row[0] && !row[colProjId])) continue;
+            var projId = String(row[colProjId]).trim();
             var masterInfo = masterMap[projId] || { allocated: 0, spent: 0, loan: 0, balance: 0 };
             var item = {
-                rowId: i + 1,
-                order: row[4],
-                project: row[7],
-                activity: row[8],
-                subActivity: row[9],
-                amount: parseAmount(row[15]),
-                date: formatToThaiUI(row[17]), // ✅ อัปเดตวันที่
-                type: row[18],
-                source: row[11],
-                desc: row[19],
-                id: row[1],
+                rowId: i + 1, 
+                order: row[colOrder],
+                project: row[colProj],
+                activity: row[colAct],
+                subActivity: row[colSub],
+                amount: parseAmount(row[colAmount]),
+                date: formatToThaiUI(row[colDate]), 
+                type: row[colExpType],
+                source: row[colSource],
+                desc: row[colDesc],
+                id: projId,
                 masterAllocated: masterInfo.allocated,
                 masterSpent: masterInfo.spent,
                 masterLoan: masterInfo.loan,
@@ -713,7 +768,7 @@ function getLoanHistory() {
     try {
         var mSheet = ss.getSheetByName('m_actionplan');
         if (mSheet) {
-            var map = getColumnMap(mSheet); // 🌟 FIX: ใช้ Dynamic Column Map แทน hardcoded index
+            var map = getColumnMap(mSheet); 
             var mData = mSheet.getDataRange().getDisplayValues();
             for (var i = 1; i < mData.length; i++) {
                 var pid = String(mData[i][map[COL_NAME.ID]]).trim();
@@ -721,35 +776,53 @@ function getLoanHistory() {
             }
         }
     } catch (e) { }
+
     var tData = tSheet.getDataRange().getDisplayValues();
+    if (tData.length < 2) return [];
+    var headers = tData[0];
+    
+    var colProjId = headers.indexOf(COL_NAME.ID) > -1 ? headers.indexOf(COL_NAME.ID) : 1;
+    var colDept = headers.indexOf(COL_NAME.DEPT) > -1 ? headers.indexOf(COL_NAME.DEPT) : 5;
+    var colOrder = headers.indexOf(COL_NAME.ORDER) > -1 ? headers.indexOf(COL_NAME.ORDER) : 4;
+    var colProj = headers.indexOf(COL_NAME.PROJ) > -1 ? headers.indexOf(COL_NAME.PROJ) : 7;
+    var colAct = headers.indexOf(COL_NAME.ACT) > -1 ? headers.indexOf(COL_NAME.ACT) : 8;
+    var colSub = headers.indexOf(COL_NAME.SUB) > -1 ? headers.indexOf(COL_NAME.SUB) : 9;
+    var colAmount = headers.indexOf('เงินยืม') > -1 ? headers.indexOf('เงินยืม') : 15;
+    var colDate = headers.indexOf('วันที่ยืมเงิน') > -1 ? headers.indexOf('วันที่ยืมเงิน') : 16;
+    var colType = headers.indexOf('ประเภทเงินยืม') > -1 ? headers.indexOf('ประเภทเงินยืม') : 17;
+    var colDesc = headers.indexOf('รายละเอียดการยืมเงิน') > -1 ? headers.indexOf('รายละเอียดการยืมเงิน') : 18;
+    var colStatus = headers.indexOf('สถานะการเบิกจ่าย') > -1 ? headers.indexOf('สถานะการเบิกจ่าย') : 19;
+    var colPaid = headers.indexOf('จำนวนเบิกจ่าย') > -1 ? headers.indexOf('จำนวนเบิกจ่าย') : 20;
+    var colBalance = headers.indexOf('คงเหลือ') > -1 ? headers.indexOf('คงเหลือ') : 21;
+
     var result = [];
     var parseNum = function (val) { return parseFloat(String(val).replace(/,/g, '')) || 0; };
 
     for (var i = tData.length - 1; i >= 1; i--) {
         try {
             var row = tData[i];
-            if (!row[0] && !row[1]) continue;
-            var pid = String(row[1] || "").trim();
+            if (!row[0] && !row[colProjId]) continue;
+            var pid = String(row[colProjId] || "").trim();
             var meta = projectMap[pid] || { type: '-', source: '-' };
             result.push({
                 id: row[0],
                 timestamp: row[0],
-                projectId: row[1], // 👈 เพิ่มบรรทัดนี้! เพื่อส่งรหัสโครงการ (P-2569-xxxx)
-                rowId: i + 1,      // 👈 เพิ่มบรรทัดนี้! เพื่อส่งเลขแถวสำหรับให้ปุ่มลบทำงาน
-                project: row[7],
-                activity: row[8],
-                subActivity: row[9],
-                amount: parseNum(row[15]),
-                date: formatToThaiUI(row[16]),
-                status: row[19],
-                paid: parseNum(row[20]),
-                balance: parseNum(row[21]),
-                order: row[4],
-                type: row[17],
-                desc: row[18],
+                projectId: pid, 
+                rowId: i + 1,      
+                project: row[colProj],
+                activity: row[colAct],
+                subActivity: row[colSub],
+                amount: parseNum(row[colAmount]),
+                date: formatToThaiUI(row[colDate]),
+                status: row[colStatus],
+                paid: parseNum(row[colPaid]),
+                balance: parseNum(row[colBalance]),
+                order: row[colOrder],
+                type: row[colType],
+                desc: row[colDesc],
                 budgetType: meta.type,
                 budgetSource: meta.source,
-                dept: row[2]
+                dept: row[colDept]
             });
         } catch (e) { }
     }
@@ -1535,30 +1608,30 @@ function saveRepayment(payload) {
         if (sheetL) {
             var tData = sheetL.getDataRange().getValues();
             var targetRowL = -1;
-
+            
             for (var j = tData.length - 1; j >= 1; j--) {
                 if (String(tData[j][1]).trim() === projectId) { // คอลัมน์ B (Index 1) คือ รหัสโครงการ
                     targetRowL = j + 1;
-
+                    
                     var currentLoanAmt = Number(tData[j][15]) || 0; // คอลัมน์ P (Index 15): ยอดเงินยืม
                     var currentPaid = Number(tData[j][20]) || 0;    // คอลัมน์ U (Index 20): จำนวนเบิกจ่าย
-
+                    
                     var newPaid = currentPaid + actualSpent;
                     // ยอดคงเหลือ = เงินยืม - (ยอดเบิกจ่ายสะสม + เงินทอนที่คืนมา)
-                    var newBalance = currentLoanAmt - (newPaid + returnedAmount);
-
+                    var newBalance = currentLoanAmt - (newPaid + returnedAmount); 
+                    
                     if (newBalance < 0) newBalance = 0;
                     var status = (newBalance === 0) ? "คืนครบ" : "คืนบางส่วน";
 
                     sheetL.getRange(targetRowL, 20).setValue(status); // คอลัมน์ T (Index 19): สถานะ
                     sheetL.getRange(targetRowL, 21).setValue(newPaid); // คอลัมน์ U (Index 20): จำนวนเบิกจ่าย
                     sheetL.getRange(targetRowL, 22).setValue(newBalance); // คอลัมน์ V (Index 21): คงเหลือ
-
+                    
                     // บันทึกวันที่เบิกจ่าย
                     if (payload.repayDate) {
                         sheetL.getRange(targetRowL, 23).setValue(formatToStorageDate(payload.repayDate)); // คอลัมน์ W (Index 22)
                     }
-
+                    
                     break;
                 }
             }
@@ -1589,7 +1662,7 @@ function saveRepayment(payload) {
 
             // 🎯 อัปเดตยอด "เบิกจ่าย" (บวกยอดที่ใช้จริง) 
             sheetM.getRange(targetRowM, spentIdx).setValue(curSpent + actualSpent);
-
+            
             // 🎯 อัปเดตยอด "เงินยืม" (หักยอดเคลียร์บิล+เงินทอน)
             sheetM.getRange(targetRowM, loanIdx).setValue(curLoan - totalClear);
 
@@ -1685,7 +1758,7 @@ function updateLoanAmount(projectId, newAmount) {
 
         for (var i = 1; i < mData.length; i++) {
             if (String(mData[i][map[COL_NAME.ID]]).trim() === String(projectId).trim()) {
-                targetRowM = i + 1;
+                targetRowM = i + 1; 
                 break;
             }
         }
@@ -1696,7 +1769,7 @@ function updateLoanAmount(projectId, newAmount) {
 
             var currentMasterLoan = Number(sheetM.getRange(targetRowM, loanIdx).getValue()) || 0;
             var currentBal = Number(sheetM.getRange(targetRowM, balIdx).getValue()) || 0;
-
+            
             // คำนวณส่วนต่างระหว่างยอดใหม่และยอดเดิม
             var diffAmount = parsedAmount - oldAmount;
 
@@ -1709,16 +1782,16 @@ function updateLoanAmount(projectId, newAmount) {
 
             // อัปเดตเฉพาะช่องเงินยืมใน m_actionplan โดยบวกส่วนต่างเข้าไป
             sheetM.getRange(targetRowM, loanIdx).setValue(currentMasterLoan + diffAmount);
-
+            
             SpreadsheetApp.flush();
             return { status: 'success', message: 'แก้ไขยอดเงินยืมสำเร็จ!' };
         }
-
+        
         return { status: 'error', message: 'ไม่พบรหัสโครงการนี้ใน Master Plan' };
     } catch (e) {
         return { status: 'error', message: e.message };
-    } finally {
-        lock.releaseLock();
+    } finally { 
+        lock.releaseLock(); 
     }
 }
 
@@ -1959,6 +2032,89 @@ function deleteAllocationRecord(rowId, projectId, amount) {
         lock.releaseLock();
     }
 }
+
+// Start function system setting  
+
+// ==========================================
+// 📌 LOOKUP SETTINGS MANAGEMENT
+// ==========================================
+
+function getLookupList(sheetName) {
+    try {
+        var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+        var sheet = ss.getSheetByName(sheetName);
+        if (!sheet) return { status: 'error', message: 'ไม่พบ Sheet: ' + sheetName };
+        
+        var data = sheet.getDataRange().getValues();
+        var list = [];
+        
+        // เริ่มนับที่ 1 เพื่อข้าม Header (สมมติว่าแถว 1 คือ Header)
+        for (var i = 1; i < data.length; i++) {
+            var itemText = String(data[i][0]).trim();
+            if (itemText !== '') {
+                list.push({ text: itemText, row: i + 1 });
+            }
+        }
+        return { status: 'success', data: list };
+    } catch (e) { 
+        return { status: 'error', message: e.message }; 
+    }
+}
+
+function addLookupItem(sheetName, itemValue) {
+    var lock = LockService.getScriptLock();
+    try {
+        lock.waitLock(10000);
+        var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+        var sheet = ss.getSheetByName(sheetName);
+        if (!sheet) return { status: 'error', message: 'ไม่พบ Sheet: ' + sheetName };
+        
+        sheet.appendRow([String(itemValue).trim()]);
+        SpreadsheetApp.flush();
+        return { status: 'success', message: 'เพิ่มรายการสำเร็จ' };
+    } catch (e) { 
+        return { status: 'error', message: e.message }; 
+    } finally { 
+        lock.releaseLock(); 
+    }
+}
+
+function editLookupItem(sheetName, rowIndex, newValue) {
+    var lock = LockService.getScriptLock();
+    try {
+        lock.waitLock(10000);
+        var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+        var sheet = ss.getSheetByName(sheetName);
+        if (!sheet) return { status: 'error', message: 'ไม่พบ Sheet: ' + sheetName };
+        
+        sheet.getRange(rowIndex, 1).setValue(String(newValue).trim());
+        SpreadsheetApp.flush();
+        return { status: 'success', message: 'แก้ไขรายการสำเร็จ' };
+    } catch (e) { 
+        return { status: 'error', message: e.message }; 
+    } finally { 
+        lock.releaseLock(); 
+    }
+}
+
+function deleteLookupItem(sheetName, rowIndex) {
+    var lock = LockService.getScriptLock();
+    try {
+        lock.waitLock(10000);
+        var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+        var sheet = ss.getSheetByName(sheetName);
+        if (!sheet) return { status: 'error', message: 'ไม่พบ Sheet: ' + sheetName };
+        
+        sheet.deleteRow(rowIndex);
+        SpreadsheetApp.flush();
+        return { status: 'success', message: 'ลบรายการสำเร็จ' };
+    } catch (e) { 
+        return { status: 'error', message: e.message }; 
+    } finally { 
+        lock.releaseLock(); 
+    }
+}
+// End function system setting  
 
 // ==========================================
 // 📌 ฟังก์ชันทดสอบระบบ Dynamic Column (กด Run เพื่อเช็คความชัวร์!)

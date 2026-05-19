@@ -222,7 +222,7 @@
   }
 
   /* Fix: Ensure filter-order Select2 always shows selected text */
-  #filter-order~.select2-container {
+  #filter-order ~ .select2-container {
     min-width: 70px !important;
   }
 
@@ -335,51 +335,28 @@
   }
 
   /* 2. Sticky Table Header: ตรึงหัวตารางไว้ด้านบนเวลาเลื่อนดูข้อมูลเยอะๆ */
-  .table-responsive {
-    min-height: 60vh;
-    /* 🌟 เพิ่มบรรทัดนี้: บังคับให้ตารางสูงอย่างน้อย 60% ของหน้าจอเสมอ */
-    max-height: 70vh;
-    /* 🌟 ปรับตรงนี้เพิ่มขึ้นนิดนึง ให้ตารางขยายได้มากขึ้นเวลาข้อมูลเยอะ */
-    overflow-y: auto;
-    border-radius: 0.5rem;
-    margin-bottom: 1.5rem;
-    /* 🌟 ดันปุ่มเปลี่ยนหน้า (Pagination) ลงไปให้ห่างจากขอบตาราง */
-  }
-
-  /* 🎯 คืนค่าสีหัวตารางให้เป็นไปตาม Theme ของแต่ละหน้า */
-  thead.bg-light th {
-    background-color: #f8f9fa !important;
-    color: #495057 !important;
-  }
-
-  thead.bg-success th {
-    background-color: #198754 !important;
-    color: #ffffff !important;
-  }
-
-  thead.bg-warning th {
-    background-color: #ffc107 !important;
-    color: #212529 !important;
-  }
-
-  thead.bg-dark th {
-    background-color: #212529 !important;
-    color: #ffffff !important;
-  }
-
-  thead.bg-primary th {
-    background-color: #0d6efd !important;
-    color: #ffffff !important;
-  }
+      .table-responsive {
+        min-height: 60vh;  /* 🌟 เพิ่มบรรทัดนี้: บังคับให้ตารางสูงอย่างน้อย 60% ของหน้าจอเสมอ */
+        max-height: 70vh;  /* 🌟 ปรับตรงนี้เพิ่มขึ้นนิดนึง ให้ตารางขยายได้มากขึ้นเวลาข้อมูลเยอะ */
+        overflow-y: auto;
+        border-radius: 0.5rem;
+        margin-bottom: 1.5rem; /* 🌟 ดันปุ่มเปลี่ยนหน้า (Pagination) ลงไปให้ห่างจากขอบตาราง */
+      }
+        
+        /* 🎯 คืนค่าสีหัวตารางให้เป็นไปตาม Theme ของแต่ละหน้า */
+        thead.bg-light th { background-color: #f8f9fa !important; color: #495057 !important; }
+        thead.bg-success th { background-color: #198754 !important; color: #ffffff !important; }
+        thead.bg-warning th { background-color: #ffc107 !important; color: #212529 !important; }
+        thead.bg-dark th { background-color: #212529 !important; color: #ffffff !important; }
+        thead.bg-primary th { background-color: #0d6efd !important; color: #ffffff !important; }
 
   /* 🌟 คลาสใหม่: บังคับให้ตารางมีความสูงคงที่ เลื่อนได้ และปุ่มแบ่งหน้าอยู่ด้านล่างเสมอ */
   .table-scrollable {
-    max-height: 60vh;
-    /* ขยายความสูงของกรอบ (ถ้าอยากให้สูงกว่านี้ ปรับเป็น 65vh หรือ 70vh ได้ครับ) */
+    max-height: 60vh; /* ขยายความสูงของกรอบ (ถ้าอยากให้สูงกว่านี้ ปรับเป็น 65vh หรือ 70vh ได้ครับ) */
     overflow-y: auto;
     border-bottom: 1px solid #dee2e6;
   }
-
+  
   /* ลบขอบล่างของตารางออกเพื่อไม่ให้ซ้อนกับขอบของกรอบ */
   .table-scrollable table {
     border-bottom: none !important;
@@ -391,32 +368,29 @@
 
   /* 1. ปลดล็อกกรอบนอกสุด (Bootstrap) ไม่ให้บีบตาราง */
   .table-responsive {
-    max-height: none !important;
-    overflow: visible !important;
+      max-height: none !important;
+      overflow: visible !important;
   }
 
   /* 2. ยืดกรอบชั้นในของ DataTables ให้สูงขึ้น และดันปุ่มลงไป */
   .table-scrollable {
-    min-height: 65vh !important;
-    /* 👈 บังคับสูงอย่างน้อย 65% ของหน้าจอ */
-    max-height: 75vh !important;
-    /* 👈 ถ้าข้อมูลเยอะ ให้ยืดได้สูงสุด 75% */
-    overflow-y: auto !important;
-    /* 👈 ให้ Scrollbar โผล่เฉพาะตรงนี้ */
-    margin-bottom: 1.5rem !important;
-    border-bottom: 1px solid #dee2e6;
-    /* เพิ่มเส้นขอบล่างนิดนึงให้ดูเรียบร้อย */
+      min-height: 65vh !important;  /* 👈 บังคับสูงอย่างน้อย 65% ของหน้าจอ */
+      max-height: 75vh !important;  /* 👈 ถ้าข้อมูลเยอะ ให้ยืดได้สูงสุด 75% */
+      overflow-y: auto !important;  /* 👈 ให้ Scrollbar โผล่เฉพาะตรงนี้ */
+      margin-bottom: 1.5rem !important; 
+      border-bottom: 1px solid #dee2e6; /* เพิ่มเส้นขอบล่างนิดนึงให้ดูเรียบร้อย */
   }
 
   /* 3. จัดระยะห่างปุ่มเปลี่ยนหน้า (Pagination) ด้านล่าง */
-  .dataTables_wrapper>.row:last-child {
-    margin-top: 1rem !important;
-    padding-bottom: 1.5rem !important;
+  .dataTables_wrapper > .row:last-child {
+      margin-top: 1rem !important;
+      padding-bottom: 1.5rem !important;
   }
 
   /* 4. เพิ่มช่องว่าง (Padding) บน-ล่าง ของแต่ละแถวให้ดูโปร่งขึ้น */
   table.dataTable tbody td {
-    padding-top: 1.2rem !important;
-    padding-bottom: 1.2rem !important;
+      padding-top: 1.2rem !important;
+      padding-bottom: 1.2rem !important;
   }
+
 </style>

@@ -18,13 +18,13 @@
                 }
 
                 // 🌟 อัปเดตตัวแปร Global ทันที
-                globalMasterPlanData = data;
+                globalMasterPlanData = data; 
                 if (typeof CACHED_OPTIONS !== 'undefined') CACHED_OPTIONS = data; // อัปเดต Cache หน้าบ้านด้วย
 
                 populateMasterPlanFilters(data);
                 renderMasterPlanTable(data);
                 updateMasterPlanSummary(data);
-
+                
                 // 🌟 [Phase 3] สั่งให้หน้า Dashboard และ Tracking อัปเดตตัวเองอัตโนมัติ (ถ้าเปิดอยู่)
                 if (typeof loadSummary === 'function' && $('#summary-page').is(':visible')) loadSummary();
                 if (typeof processTrackingLogic === 'function' && $('#tracking-page').is(':visible')) processTrackingLogic();
@@ -40,59 +40,59 @@
     }
 
     function renderMasterPlanTable(data) {
-        // 🔥 1. เคลียร์ DataTables เดิมทิ้ง
-        if ($.fn.DataTable.isDataTable('#tableMasterPlan')) {
-            $('#tableMasterPlan').DataTable().clear().destroy();
-        }
+    // 🔥 1. เคลียร์ DataTables เดิมทิ้ง
+    if ($.fn.DataTable.isDataTable('#tableMasterPlan')) {
+        $('#tableMasterPlan').DataTable().clear().destroy();
+    }
 
-        let tbody = $('#masterPlanTableBody').empty();
-        let html = '';
+    let tbody = $('#masterPlanTableBody').empty(); 
+    let html = '';
 
-        // 💥 2. กรองบรรทัดว่างทิ้ง
-        let validData = (data || []).filter(r => r.id && String(r.id).trim() !== '' && r.proj && String(r.proj).trim() !== '');
+    // 💥 2. กรองบรรทัดว่างทิ้ง
+    let validData = (data || []).filter(r => r.id && String(r.id).trim() !== '' && r.proj && String(r.proj).trim() !== '');
 
-        if (validData.length === 0) {
-            html = '<tr><td colspan="9" class="text-center text-muted py-4">ไม่พบข้อมูล</td></tr>';
-        } else {
-            // 🗂️ 3. จัดกลุ่มข้อมูลตาม "ชื่อโครงการ"
-            let grouped = {};
-            validData.forEach(r => {
-                let pName = String(r.proj).trim();
-                if (!grouped[pName]) {
-                    grouped[pName] = {
-                        type: String(r.type || '').trim(),
-                        source: String(r.source || '').trim(),
-                        dept: String(r.dept || '-').trim(),
-                        order: r.order || '-',
-                        items: []
-                    };
-                }
-                grouped[pName].items.push(r);
-            });
+    if (validData.length === 0) {
+        html = '<tr><td colspan="9" class="text-center text-muted py-4">ไม่พบข้อมูล</td></tr>';
+    } else {
+        // 🗂️ 3. จัดกลุ่มข้อมูลตาม "ชื่อโครงการ"
+        let grouped = {};
+        validData.forEach(r => {
+            let pName = String(r.proj).trim();
+            if (!grouped[pName]) {
+                grouped[pName] = {
+                    type: String(r.type || '').trim(),
+                    source: String(r.source || '').trim(),
+                    dept: String(r.dept || '-').trim(),
+                    order: r.order || '-',
+                    items: []
+                };
+            }
+            grouped[pName].items.push(r);
+        });
 
-            // 🎨 4. วนลูปวาดตารางแบบลดหลั่นชั้น (เยื้องขั้นบันได)
-            for (let pName in grouped) {
-                let g = grouped[pName];
+        // 🎨 4. วนลูปวาดตารางแบบลดหลั่นชั้น (เยื้องขั้นบันได)
+        for (let pName in grouped) {
+            let g = grouped[pName];
 
-                // --- Logic วาด Badge สี ---
-                let typeBadgeHtml = '';
-                if (g.type) {
-                    let typeStyle = 'background-color: #6c757d; color: white;';
-                    if (g.type.includes('สป.สธ')) typeStyle = 'background-color: #1a237e; color: white;';
-                    else if (g.type.includes('เงินนอก')) typeStyle = 'background-color: #0d6efd; color: white;';
-                    typeBadgeHtml = `<span class="badge fw-normal shadow-sm" style="${typeStyle}">${g.type}</span>`;
-                }
+            // --- Logic วาด Badge สี ---
+            let typeBadgeHtml = '';
+            if (g.type) {
+                let typeStyle = 'background-color: #6c757d; color: white;';
+                if (g.type.includes('สป.สธ')) typeStyle = 'background-color: #1a237e; color: white;';
+                else if (g.type.includes('เงินนอก')) typeStyle = 'background-color: #0d6efd; color: white;';
+                typeBadgeHtml = `<span class="badge fw-normal shadow-sm" style="${typeStyle}">${g.type}</span>`;
+            }
 
-                let sourceBadgeHtml = '';
-                if (g.source) {
-                    let sourceStyle = 'background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;';
-                    if (g.source.includes('เงินบำรุง สสจ.เลย')) sourceStyle = 'background-color: #e6f2ff; color: #0d6efd; border: 1px solid #99caff;';
-                    sourceBadgeHtml = `<span class="badge fw-normal" style="${sourceStyle}">${g.source}</span>`;
-                }
-                let badgeContainer = (typeBadgeHtml || sourceBadgeHtml) ? `<div class="mb-1 d-flex gap-2 flex-wrap">${typeBadgeHtml}${sourceBadgeHtml}</div>` : '';
+            let sourceBadgeHtml = '';
+            if (g.source) {
+                let sourceStyle = 'background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;';
+                if (g.source.includes('เงินบำรุง สสจ.เลย')) sourceStyle = 'background-color: #e6f2ff; color: #0d6efd; border: 1px solid #99caff;';
+                sourceBadgeHtml = `<span class="badge fw-normal" style="${sourceStyle}">${g.source}</span>`;
+            }
+            let badgeContainer = (typeBadgeHtml || sourceBadgeHtml) ? `<div class="mb-1 d-flex gap-2 flex-wrap">${typeBadgeHtml}${sourceBadgeHtml}</div>` : '';
 
-                // 🌟 1. วาดแถวหัวหน้ากลุ่ม (ชื่อโครงการ) - ชิดซ้ายสุด
-                html += `
+            // 🌟 1. วาดแถวหัวหน้ากลุ่ม (ชื่อโครงการ) - ชิดซ้ายสุด
+            html += `
                 <tr class="table-light">
                     <td></td> <td class="align-middle fw-bold text-muted text-center border-end"> 
                         <div class="h6 mb-0 text-dark">${g.order}</div>
@@ -106,74 +106,74 @@
                 </tr>
             `;
 
-                // 🌟 2. วาดแถวลูกน้อง (กิจกรรมหลัก/ย่อย)
-                g.items.forEach(act => {
-                    let mainAct = String(act.act || '').replace(/undefined/gi, '').replace(/null/gi, '').trim();
-                    let subAct = String(act.subAct || act.sub || '').replace(/undefined/gi, '').replace(/null/gi, '').trim();
+            // 🌟 2. วาดแถวลูกน้อง (กิจกรรมหลัก/ย่อย)
+            g.items.forEach(act => {
+                let mainAct = String(act.act || '').replace(/undefined/gi, '').replace(/null/gi, '').trim();
+                let subAct = String(act.subAct || act.sub || '').replace(/undefined/gi, '').replace(/null/gi, '').trim();
 
-                    // 🎨 ปรับการเยื้อง (Indentation) ตรงนี้ครับ!
-                    // กิจกรรมหลัก: เยื้องเข้ามา 1 ระดับ (ms-3)
-                    let detailHtml = `<div class="text-dark ms-3"><i class="fas fa-level-up-alt fa-rotate-90 me-2 text-muted"></i>กิจกรรมหลัก : ${mainAct || '-'}</div>`;
+                // 🎨 ปรับการเยื้อง (Indentation) ตรงนี้ครับ!
+                // กิจกรรมหลัก: เยื้องเข้ามา 1 ระดับ (ms-3)
+                let detailHtml = `<div class="text-dark ms-3"><i class="fas fa-level-up-alt fa-rotate-90 me-2 text-muted"></i>กิจกรรมหลัก : ${mainAct || '-'}</div>`;
+                
+                // กิจกรรมย่อย: เยื้องเข้ามาอีก 2 ระดับ (ms-5 ps-3)
+                if (subAct.length > 0) {
+                    detailHtml += `<div class="text-muted small mt-1 ms-5 ps-3"><i class="fas fa-level-up-alt fa-rotate-90 me-2 text-danger"></i>กิจกรรมย่อย : ${subAct}</div>`;
+                }
 
-                    // กิจกรรมย่อย: เยื้องเข้ามาอีก 2 ระดับ (ms-5 ps-3)
-                    if (subAct.length > 0) {
-                        detailHtml += `<div class="text-muted small mt-1 ms-5 ps-3"><i class="fas fa-level-up-alt fa-rotate-90 me-2 text-danger"></i>กิจกรรมย่อย : ${subAct}</div>`;
-                    }
+                let statusHtml = '';
+                if (act.status === 'ACTIVE') statusHtml = '<span class="badge bg-success bg-opacity-10 text-success border border-success"><i class="fas fa-check-circle me-1"></i> ACTIVE</span>';
+                else if (act.status === 'INACTIVE') statusHtml = '<span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary"><i class="fas fa-ban me-1"></i> INACTIVE</span>';
+                else if (act.status === 'REFUNDED') statusHtml = '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger"><i class="fas fa-undo me-1"></i> REFUNDED</span>';
 
-                    let statusHtml = '';
-                    if (act.status === 'ACTIVE') statusHtml = '<span class="badge bg-success bg-opacity-10 text-success border border-success"><i class="fas fa-check-circle me-1"></i> ACTIVE</span>';
-                    else if (act.status === 'INACTIVE') statusHtml = '<span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary"><i class="fas fa-ban me-1"></i> INACTIVE</span>';
-                    else if (act.status === 'REFUNDED') statusHtml = '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger"><i class="fas fa-undo me-1"></i> REFUNDED</span>';
-
-                    let btnHtml = `
+                let btnHtml = `
                     <div class="d-flex justify-content-center gap-1">
                         <button class="btn btn-sm btn-outline-primary shadow-sm" onclick="editMasterPlan('${act.id}')" title="แก้ไข"><i class="fas fa-edit"></i></button>
                         <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteMasterPlan('${act.id}')" title="ลบ"><i class="fas fa-trash-alt"></i></button>
                     </div>
                 `;
 
-                    html += `
+                html += `
                     <tr>
                         <td class="text-center align-middle"><input class="form-check-input mp-checkbox" type="checkbox" value="${act.id}"></td>
                         <td class="border-end"></td> 
-                        <td class="align-middle border-end">${detailHtml}</td> <td class="text-end fw-bold text-success align-middle">${Number(act.allocated || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td class="text-end text-danger align-middle">${Number(act.spent || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td class="text-end text-warning align-middle">${Number(act.loan || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td class="text-end fw-bold text-primary align-middle">${Number(act.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                        <td class="align-middle border-end">${detailHtml}</td> <td class="text-end fw-bold text-success align-middle">${Number(act.allocated || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                        <td class="text-end text-danger align-middle">${Number(act.spent || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                        <td class="text-end text-warning align-middle">${Number(act.loan || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                        <td class="text-end fw-bold text-primary align-middle">${Number(act.balance || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
                         <td class="text-center align-middle">${statusHtml}</td>
                         <td class="text-center align-middle">${btnHtml}</td>
                     </tr>
                 `;
-                });
-            }
+            });
         }
-
-        tbody.html(html);
-
-        // 🎯 5. ตั้งค่า DataTables
-        $('#tableMasterPlan').DataTable({
-            responsive: true,
-            "pageLength": 10,
-            "lengthChange": true,
-            "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "ทั้งหมด"]],
-            "searching": true,
-            "ordering": false,
-            "info": true,
-            "language": {
-                "lengthMenu": "แสดง _MENU_ รายการ",
-                "search": "ค้นหาในตาราง:",
-                "paginate": { "next": "ถัดไป", "previous": "ก่อนหน้า" },
-                "info": "แสดง _START_ ถึง _END_ จาก _TOTAL_ รายการ",
-                "infoEmpty": "แสดง 0 รายการ",
-                "infoFiltered": "(กรองจาก _MAX_ รายการ)"
-            }
-        });
     }
+
+    tbody.html(html);
+
+    // 🎯 5. ตั้งค่า DataTables
+    $('#tableMasterPlan').DataTable({ 
+        responsive: true,
+        "pageLength": 10,
+        "lengthChange": true,
+        "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "ทั้งหมด"]],
+        "searching": true,
+        "ordering": false,
+        "info": true,
+        "language": {
+            "lengthMenu": "แสดง _MENU_ รายการ",
+            "search": "ค้นหาในตาราง:",
+            "paginate": { "next": "ถัดไป", "previous": "ก่อนหน้า" },
+            "info": "แสดง _START_ ถึง _END_ จาก _TOTAL_ รายการ",
+            "infoEmpty": "แสดง 0 รายการ",
+            "infoFiltered": "(กรองจาก _MAX_ รายการ)"
+        }
+    });
+}
 
     // 3️⃣ อัปเดต Summary Cards
     function updateMasterPlanSummary(data) {
-        let sumMoph = 0;
-        let sumNonMoph = 0;
+        let sumMoph = 0; 
+        let sumNonMoph = 0; 
         let sumLoeiFund = 0;
 
         data.forEach(row => {
@@ -184,7 +184,7 @@
             let bal = Number(row.balance) || 0;
             let typeVal = String(row.type || '').trim();
             let sourceVal = String(row.source || '').trim();
-
+            
             // ลบช่องว่างเพื่อป้องกันการพิมพ์ผิด หรือเว้นวรรคไม่เท่ากัน (Human Error)
             let cType = typeVal.replace(/\s+/g, '');
             let cSource = sourceVal.replace(/\s+/g, '');
@@ -192,11 +192,11 @@
             // 2. เงื่อนไข: ประเภทงบ = สป.สธ.
             if (cType === 'สป.สธ.') {
                 sumMoph += bal;
-            }
+            } 
             // 3. เงื่อนไข: ประเภทงบ = เงินนอก สป.
             else if (cType === 'เงินนอกสป.') {
                 sumNonMoph += bal;
-
+                
                 // 4. เงื่อนไขย่อย: แหล่งงบประมาณ = เงินบำรุง สสจ.เลย
                 if (cSource === 'เงินบำรุงสสจ.เลย') {
                     sumLoeiFund += bal;
@@ -284,10 +284,10 @@
             let selectedOrder = $('#filter-order').val(); let selectedProj = $('#filter-proj').val(); let selectedAct = $(this).val();
             if (selectedAct) {
                 let filteredSub = data.filter(r => String(r.order) === String(selectedOrder) && r.proj === selectedProj && r.act === selectedAct);
-
+                
                 // 🌟 จุดที่แก้ไขครับ: เปลี่ยน 'sub' เป็น 'subAct' ให้ตรงกับหลังบ้าน
                 $('#filter-sub').empty().html(makeOptions(getUnique(filteredSub, 'subAct'))).prop('disabled', false).select2({ theme: 'bootstrap-5' });
-
+                
             } else disableAndReset('#filter-sub');
         });
     }
@@ -335,19 +335,19 @@
 
     function openAddPlanModal() {
         $('#formMasterPlan').removeClass('was-validated'); // ล้างกรอบสีแดงแจ้งเตือน
-        $('#formMasterPlan')[0].reset();
+        $('#formMasterPlan')[0].reset(); 
         $('#p_id').val('');
-
+        
         // ล้างช่องข้อมูลงบประมาณและข้อมูลใหม่
         $('#p_budget_code, #p_act_code, #p_bal, #p_approve, #p_alloc').val('');
         $('#p_opType, #p_expType, #p_expDetail, #p_projRemark').val('');
-
+        
         $('.select2-modal').val(null).trigger('change');
         $('.month-chk').prop('checked', false);
-
-        $('#p_year').val(getThaiFiscalYear());
+        
+        $('#p_year').val(getThaiFiscalYear()); 
         $('#p_status').val('ACTIVE');
-
+        
         $('#planModalTitle').html('<i class="fas fa-plus-circle me-2"></i>เพิ่มโครงการใหม่');
         $('#modalMasterPlan').modal('show');
     }
@@ -358,7 +358,7 @@
 
         $('#formMasterPlan').removeClass('was-validated'); // ล้างกรอบสีแดงแจ้งเตือนตอนเปิดแก้ไข
         $('#planModalTitle').html('<i class="fas fa-edit me-2"></i>แก้ไขข้อมูลโครงการ');
-
+        
         // หมวด 1: ข้อมูลหลัก
         $('#p_id').val(row.id);
         $('#p_year').val(row.year || getThaiFiscalYear());
@@ -381,7 +381,7 @@
         $('#p_act_code').val(row.actCode || '');
         $('#p_expType').val(row.expType || '');
         $('#p_expDetail').val(row.expDetail || '');
-
+        
         $('#p_approve').val(row.approve || '');
         $('#p_alloc').val(row.allocated || '');
         $('#p_bal').val(Number(row.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }));
@@ -391,7 +391,7 @@
         if (row.timeline && Array.isArray(row.timeline)) {
             const thaiMonths = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'];
             row.timeline.forEach((val, index) => {
-                if (Number(val) === 1) {
+                if (Number(val) === 1) { 
                     $(`.month-chk[value="${thaiMonths[index]}"]`).prop('checked', true);
                 }
             });
@@ -400,13 +400,13 @@
         let s = String(row.status || '').trim().toUpperCase();
         if (['ACTIVE', 'INACTIVE', 'REFUNDED'].includes(s)) $('#p_status').val(s); else $('#p_status').val('ACTIVE');
         $('#p_remark').val(row.remark || '');
-
+        
         $('#modalMasterPlan').modal('show');
     }
 
     function submitMasterPlan(e) {
         e.preventDefault();
-
+        
         // 🛑 เช็คความถูกต้องของฟอร์ม (Validation)
         var form = document.getElementById('formMasterPlan');
         if (!form.checkValidity()) {
@@ -420,31 +420,31 @@
 
         // แพ็กของเตรียมส่งไปหลังบ้าน
         let payload = {
-            id: $('#p_id').val(),
-            year: $('#p_year').val(),
-            cat: $('#p_cat').val(),
+            id: $('#p_id').val(), 
+            year: $('#p_year').val(), 
+            cat: $('#p_cat').val(), 
             order: $('#p_order').val(),
-            dept: $('#p_dept').val(),
-            plan: $('#p_plan').val(),
-
-            proj: $('#p_proj').val(),
-            act: $('#p_act').val(),
+            dept: $('#p_dept').val(), 
+            plan: $('#p_plan').val(), 
+            
+            proj: $('#p_proj').val(), 
+            act: $('#p_act').val(), 
             sub: $('#p_sub').val(),
             opType: $('#p_opType').val(),
             projRemark: $('#p_projRemark').val(),
 
-            type: $('#p_type').val(),
+            type: $('#p_type').val(), 
             source: $('#p_source').val(),
-            budgetCode: $('#p_budget_code').val(),
+            budgetCode: $('#p_budget_code').val(), 
             actCode: $('#p_act_code').val(),
             expType: $('#p_expType').val(),
             expDetail: $('#p_expDetail').val(),
-
+            
             approve: $('#p_approve').val(),
             allocated: $('#p_alloc').val(),
 
-            months: selectedMonths.join(', '),
-            status: $('#p_status').val(),
+            months: selectedMonths.join(', '), 
+            status: $('#p_status').val(), 
             remark: $('#p_remark').val()
         };
 

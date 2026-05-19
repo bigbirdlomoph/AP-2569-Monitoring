@@ -4,12 +4,11 @@
 <head>
     <base target="_top">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
+    
     <!-- <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;700&display=swap" rel="stylesheet"> -->
     <!-- <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet"> -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet">
-
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" />
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -55,14 +54,11 @@
             </div>
 
             <div class="d-flex d-none d-lg-flex ms-4">
-                <a href="javascript:void(0)" class="nav-pill-btn active"
-                    onclick="switchPage('dashboard', this)">Dashboard</a>
-                <a href="javascript:void(0)" class="nav-pill-btn"
-                    onclick="switchPage('search', this)">ค้นหาแผนปฏิบัติ</a>
+                <a href="javascript:void(0)" class="nav-pill-btn active" onclick="switchPage('dashboard', this)">Dashboard</a>
+                <a href="javascript:void(0)" class="nav-pill-btn" onclick="switchPage('search', this)">ค้นหาแผนปฏิบัติ</a>
                 <a href="javascript:void(0)" class="nav-pill-btn" onclick="switchPage('yearly', this)">แผนงานประจำปี</a>
                 <a href="javascript:void(0)" class="nav-pill-btn" onclick="switchPage('summary', this)">รายงานสรุป</a>
-                <a href="javascript:void(0)" class="nav-pill-btn"
-                    onclick="switchPage('tracking', this)">ติดตามโครงการ</a>
+                <a href="javascript:void(0)" class="nav-pill-btn" onclick="switchPage('tracking', this)">ติดตามโครงการ</a>
 
                 <div class="dropdown ms-2 d-none" id="menu-transaction">
                     <a class="nav-pill-btn dropdown-toggle" href="javascript:void(0)" role="button"
@@ -83,8 +79,7 @@
                         role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fas fa-user-shield me-1"></i> For Admin
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-3 mt-2"
-                        aria-labelledby="adminDropdown">
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-3 mt-2" aria-labelledby="adminDropdown">
                         <li>
                             <button class="dropdown-item py-2 text-dark" type="button"
                                 onclick="switchPage('admin'); loadAdminUsers();">
@@ -98,6 +93,12 @@
                             <button class="dropdown-item py-2 text-dark" type="button"
                                 onclick="switchPage('masterplan'); loadMasterPlanData();">
                                 <i class="fas fa-project-diagram me-2 text-primary"></i> จัดการแผนงาน
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item py-2 text-dark" type="button"
+                                onclick="switchPage('settings'); loadSettingsData();">
+                                <i class="fas fa-cogs me-2 text-secondary"></i> ตั้งค่าระบบ (Lookup)
                             </button>
                         </li>
                     </ul>
@@ -158,6 +159,9 @@
             <a href="javascript:void(0)" class="d-block text-white py-2 ps-3 text-decoration-none"
                 onclick="switchPage('admin'); loadAdminUsers(); $('.navbar-toggler').click();"><i
                     class="fas fa-users-cog me-2 text-warning"></i>Admin Panel</a>
+            <a href="javascript:void(0)" class="d-block text-white py-2 ps-3 text-decoration-none"
+                onclick="switchPage('settings'); loadSettingsData(); $('.navbar-toggler').click();"><i
+                    class="fas fa-cogs me-2 text-secondary"></i>ตั้งค่าระบบ</a>
         </div>
 
         <div class="mt-3 pt-3 border-top border-white-50">
@@ -178,109 +182,173 @@
     </div>
 
     <div class="container-fluid mt-4 px-lg-5 flex-grow-1" style="padding-bottom: 250px;">
-
+        <!-- Dashboard Page -->
         <div id="dashboard-page" class="page-section fade-in">
             <div class="mb-4">
-                <h3 class="fw-bold text-dark"><i class="fas fa-chart-bar me-2 text-secondary"></i>Loei Provincial Public
-                    Health Office Budget Management Dashboard</h3>
-
-                <button class="btn btn-outline-success bg-white shadow-sm rounded-pill px-4 fw-bold"
-                    onclick="downloadTemplate()">
+                <h3 class="fw-bold text-dark"><i class="fas fa-chart-bar me-2 text-secondary"></i>Loei Provincial Public Health Office Budget Management Dashboard</h3>
+                <button class="btn btn-outline-success bg-white shadow-sm rounded-pill px-4 fw-bold" onclick="downloadTemplate()">
                     <i class="fas fa-file-excel me-2"></i>ดาวน์โหลดแบบฟอร์มนำเข้า (Template)
                 </button>
             </div>
 
-            <div class="section-title text-success">งบประมาณเงินนอก สป. <span class="text-primary small">(เฉพาะ
-                    เงินบำรุง สสจ.เลย)</span></div>
-            <div class="row g-3 mb-4">
-                <div class="col-md-6 col-xl-3">
-                    <div class="card-metric bg-blue">
-                        <div class="card-label">อนุมัติตามแผน</div>
-                        <div class="card-value" id="nonmoph-approved">...</div><i
-                            class="fas fa-file-invoice-dollar card-icon"></i>
-                    </div>
-                </div>
-                <div class="col-md-6 col-xl-3">
-                    <div class="card-metric bg-green">
-                        <div class="card-label">จัดสรร</div>
-                        <div class="card-value" id="nonmoph-allocated">...</div><i
-                            class="fas fa-check-circle card-icon"></i>
-                    </div>
-                </div>
-                <div class="col-md-6 col-xl-3">
-                    <div class="card-metric bg-red">
-                        <div class="card-label">เบิกจ่าย</div>
-                        <div class="card-value" id="nonmoph-spent">...</div><i
-                            class="fas fa-times-circle card-icon"></i>
-                    </div>
-                </div>
-                <div class="col-md-6 col-xl-3">
-                    <div class="card-metric bg-yellow">
-                        <div class="card-label text-dark">คงเหลือ</div>
-                        <div class="card-value text-dark" id="nonmoph-balance">...</div><i
-                            class="fas fa-minus-circle card-icon text-dark"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="row g-3 mb-5">
-                <div class="col-lg-4">
-                    <div class="card border-0 shadow-sm h-100 rounded-4">
-                        <div class="card-body p-4 text-center">
-                            <h6 class="fw-bold text-muted mb-3">ภาพรวมการเบิกจ่าย</h6>
-                            <div class="gauge-wrapper mx-auto" style="height: 250px;"><canvas
-                                    id="nonMophGauge"></canvas>
-                                <div class="gauge-text text-danger" id="nonMophGaugeText">0.00%</div>
+            <!-- 1. ภาพรวมระดับองค์กร (Grand Total) -->
+            <div class="card border-0 shadow-sm mb-3 rounded-4 bg-white border-start border-4 border-primary">
+                <div class="card-body p-3">
+                    <div class="row align-items-center">
+                        <div class="col-md-3 border-end">
+                            <div class="text-primary small fw-bold mb-1"><i class="fas fa-globe me-1"></i>ภาพรวมระดับองค์กร (Grand Total)</div>
+                            <div class="text-muted small fw-bold">อนุมัติตามแผน: <span id="dash-grand-approve"><i class="fas fa-spinner fa-spin"></i></span></div>
+                        </div>
+                        <div class="col-md-3 border-end px-3">
+                            <div class="text-muted small fw-bold mb-1">งบจัดสรรรวม (บาท)</div>
+                            <h4 class="fw-bold text-dark mb-0" id="dash-grand-alloc"><i class="fas fa-spinner fa-spin"></i></h4>
+                        </div>
+                        <div class="col-md-3 border-end px-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted small fw-bold">เบิกจ่ายรวม</span>
+                                <span class="text-primary fw-bold small" id="dash-grand-pct">0.00%</span>
+                            </div>
+                            <h5 class="fw-bold text-primary mb-1" id="dash-grand-spent"><i class="fas fa-spinner fa-spin"></i></h5>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar bg-primary" id="dash-grand-progress" style="width: 0%"></div>
                             </div>
                         </div>
-                    </div>
-                </div>
-                <div class="col-lg-8">
-                    <div class="card border-0 shadow-sm h-100 rounded-4">
-                        <div class="card-body p-4">
-                            <h6 class="fw-bold text-primary mb-3">ร้อยละการเบิกจ่าย Top 10 กลุ่มงาน (เรียงมาก-น้อย)</h6>
-                            <div style="height: 300px;"><canvas id="nonMophBar"></canvas></div>
+                        <div class="col-md-3 ps-3">
+                            <div class="text-muted small fw-bold mb-1">คงเหลือสุทธิ (บาท)</div>
+                            <h4 class="fw-bold text-success mb-0" id="dash-grand-bal"><i class="fas fa-spinner fa-spin"></i></h4>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="section-title text-success mt-4">งบประมาณใน สป.สธ.</div>
-            <div class="row g-3 mb-4">
-                <div class="col-md-6 col-xl-3">
-                    <div class="card-metric bg-blue">
-                        <div class="card-label">อนุมัติตามแผน</div>
-                        <div class="card-value" id="moph-approved"><i class="fas fa-spinner fa-spin"></i></div><i
-                            class="fas fa-file-invoice-dollar card-icon"></i>
-                    </div>
-                </div>
-                <div class="col-md-6 col-xl-3">
-                    <div class="card-metric bg-green">
-                        <div class="card-label">จัดสรร</div>
-                        <div class="card-value" id="moph-allocated"><i class="fas fa-spinner fa-spin"></i></div><i
-                            class="fas fa-check-circle card-icon"></i>
-                    </div>
-                </div>
-                <div class="col-md-6 col-xl-3">
-                    <div class="card-metric bg-red">
-                        <div class="card-label">เบิกจ่าย</div>
-                        <div class="card-value" id="moph-spent"><i class="fas fa-spinner fa-spin"></i></div><i
-                            class="fas fa-times-circle card-icon"></i>
-                    </div>
-                </div>
-                <div class="col-md-6 col-xl-3">
-                    <div class="card-metric bg-yellow">
-                        <div class="card-label text-dark">คงเหลือ</div>
-                        <div class="card-value text-dark" id="moph-balance"><i class="fas fa-spinner fa-spin"></i></div>
-                        <i class="fas fa-minus-circle card-icon text-dark"></i>
+            <!-- 2. งบประมาณใน สป.สธ. -->
+            <div class="card border-0 shadow-sm mb-3 rounded-4 bg-white border-start border-4 border-success">
+                <div class="card-body p-3">
+                    <div class="row align-items-center">
+                        <div class="col-md-3 border-end">
+                            <div class="text-success small fw-bold mb-1"><i class="fas fa-university me-1"></i>งบประมาณใน สป.สธ.</div>
+                            <div class="text-muted small fw-bold">อนุมัติตามแผน: <span id="moph-approved"><i class="fas fa-spinner fa-spin"></i></span></div>
+                        </div>
+                        <div class="col-md-3 border-end px-3">
+                            <div class="text-muted small fw-bold mb-1">งบจัดสรรรวม (บาท)</div>
+                            <h4 class="fw-bold text-dark mb-0" id="moph-allocated"><i class="fas fa-spinner fa-spin"></i></h4>
+                        </div>
+                        <div class="col-md-3 border-end px-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted small fw-bold">เบิกจ่ายรวม</span>
+                                <span class="text-success fw-bold small" id="moph-pct">0.00%</span>
+                            </div>
+                            <h5 class="fw-bold text-success mb-1" id="moph-spent"><i class="fas fa-spinner fa-spin"></i></h5>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar bg-success" id="moph-progress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 ps-3">
+                            <div class="text-muted small fw-bold mb-1">คงเหลือสุทธิ (บาท)</div>
+                            <h4 class="fw-bold text-success mb-0" id="moph-balance"><i class="fas fa-spinner fa-spin"></i></h4>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="row g-3 mb-5">
+
+            <!-- 3. งบประมาณเงินนอก สป. -->
+            <div class="card border-0 shadow-sm mb-3 rounded-4 bg-white border-start border-4 border-info">
+                <div class="card-body p-3">
+                    <div class="row align-items-center">
+                        <div class="col-md-3 border-end">
+                            <div class="text-info small fw-bold mb-1"><i class="fas fa-wallet me-1"></i>เงินนอก สป. <span class="text-muted">(เฉพาะบำรุง สสจ.)</span></div>
+                            <div class="text-muted small fw-bold">อนุมัติตามแผน: <span id="nonmoph-approved"><i class="fas fa-spinner fa-spin"></i></span></div>
+                        </div>
+                        <div class="col-md-3 border-end px-3">
+                            <div class="text-muted small fw-bold mb-1">งบจัดสรรรวม (บาท)</div>
+                            <h4 class="fw-bold text-dark mb-0" id="nonmoph-allocated"><i class="fas fa-spinner fa-spin"></i></h4>
+                        </div>
+                        <div class="col-md-3 border-end px-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted small fw-bold">เบิกจ่ายรวม</span>
+                                <span class="text-info fw-bold small" id="nonmoph-pct">0.00%</span>
+                            </div>
+                            <h5 class="fw-bold text-info mb-1" id="nonmoph-spent"><i class="fas fa-spinner fa-spin"></i></h5>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar bg-info" id="nonmoph-progress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 ps-3">
+                            <div class="text-muted small fw-bold mb-1">คงเหลือสุทธิ (บาท)</div>
+                            <h4 class="fw-bold text-success mb-0" id="nonmoph-balance"><i class="fas fa-spinner fa-spin"></i></h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. เงินบำรุง สสจ.เลย (หมวด HRD) -->
+            <div class="card border-0 shadow-sm mb-3 rounded-4 bg-white border-start border-4 border-warning">
+                <div class="card-body p-3">
+                    <div class="row align-items-center">
+                        <div class="col-md-3 border-end">
+                            <div class="text-warning text-dark small fw-bold mb-1"><i class="fas fa-users me-1"></i>เงินบำรุง สสจ.เลย (หมวด HRD)</div>
+                            <div class="text-muted small fw-bold">อนุมัติตามแผน: <span id="hrd1-approved"><i class="fas fa-spinner fa-spin"></i></span></div>
+                        </div>
+                        <div class="col-md-3 border-end px-3">
+                            <div class="text-muted small fw-bold mb-1">งบจัดสรรรวม (บาท)</div>
+                            <h4 class="fw-bold text-dark mb-0" id="hrd1-allocated"><i class="fas fa-spinner fa-spin"></i></h4>
+                        </div>
+                        <div class="col-md-3 border-end px-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted small fw-bold">เบิกจ่ายรวม</span>
+                                <span class="text-warning text-dark fw-bold small" id="hrd1-pct">0.00%</span>
+                            </div>
+                            <h5 class="fw-bold text-warning text-dark mb-1" id="hrd1-spent"><i class="fas fa-spinner fa-spin"></i></h5>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar bg-warning" id="hrd1-progress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 ps-3">
+                            <div class="text-muted small fw-bold mb-1">คงเหลือสุทธิ (บาท)</div>
+                            <h4 class="fw-bold text-success mb-0" id="hrd1-balance"><i class="fas fa-spinner fa-spin"></i></h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. HRD อบรมหลักสูตรต่างๆ -->
+            <div class="card border-0 shadow-sm mb-4 rounded-4 bg-white border-start border-4 border-danger">
+                <div class="card-body p-3">
+                    <div class="row align-items-center">
+                        <div class="col-md-3 border-end">
+                            <div class="text-danger small fw-bold mb-1"><i class="fas fa-chalkboard-teacher me-1"></i>HRD อบรมหลักสูตรต่างๆ</div>
+                            <div class="text-muted small fw-bold">อนุมัติตามแผน: <span id="hrd2-approved"><i class="fas fa-spinner fa-spin"></i></span></div>
+                        </div>
+                        <div class="col-md-3 border-end px-3">
+                            <div class="text-muted small fw-bold mb-1">งบจัดสรรรวม (บาท)</div>
+                            <h4 class="fw-bold text-dark mb-0" id="hrd2-allocated"><i class="fas fa-spinner fa-spin"></i></h4>
+                        </div>
+                        <div class="col-md-3 border-end px-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted small fw-bold">เบิกจ่ายรวม</span>
+                                <span class="text-danger fw-bold small" id="hrd2-pct">0.00%</span>
+                            </div>
+                            <h5 class="fw-bold text-danger mb-1" id="hrd2-spent"><i class="fas fa-spinner fa-spin"></i></h5>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar bg-danger" id="hrd2-progress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 ps-3">
+                            <div class="text-muted small fw-bold mb-1">คงเหลือสุทธิ (บาท)</div>
+                            <h4 class="fw-bold text-success mb-0" id="hrd2-balance"><i class="fas fa-spinner fa-spin"></i></h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- กราฟ MOPH และ NON-MOPH (ย้ายลงมาด้านล่าง) -->
+            <div class="section-title text-success">สัดส่วนการใช้จ่ายงบประมาณ (แยกตามกลุ่ม)</div>
+            <div class="row g-3 mb-5 mt-2">
                 <div class="col-lg-4">
                     <div class="card border-0 shadow-sm h-100 rounded-4">
                         <div class="card-body p-4 text-center">
-                            <h6 class="fw-bold text-muted mb-3">ภาพรวมการเบิกจ่าย</h6>
-                            <div class="gauge-wrapper mx-auto" style="height: 250px;"><canvas id="mophGauge"></canvas>
+                            <h6 class="fw-bold text-muted mb-3">ภาพรวม สป.สธ.</h6>
+                            <div class="gauge-wrapper mx-auto" style="height: 200px;"><canvas id="mophGauge"></canvas>
                                 <div class="gauge-text" id="mophGaugeText">0.00%</div>
                             </div>
                         </div>
@@ -289,26 +357,45 @@
                 <div class="col-lg-8">
                     <div class="card border-0 shadow-sm h-100 rounded-4">
                         <div class="card-body p-4">
-                            <h6 class="fw-bold text-success mb-3">ร้อยละการเบิกจ่าย จำแนกตามกลุ่มงาน (เรียงมาก-น้อย)
-                            </h6>
-                            <div style="height: 300px;"><canvas id="mophBar"></canvas></div>
+                            <h6 class="fw-bold text-success mb-3">ร้อยละการเบิกจ่าย สป.สธ. (Top 10 กลุ่มงาน)</h6>
+                            <div style="height: 250px;"><canvas id="mophBar"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-5">
+                <div class="col-lg-4">
+                    <div class="card border-0 shadow-sm h-100 rounded-4">
+                        <div class="card-body p-4 text-center">
+                            <h6 class="fw-bold text-muted mb-3">ภาพรวม เงินนอก สป. <span class="small">(เฉพาะบำรุง สสจ.)</span></h6>
+                            <div class="gauge-wrapper mx-auto" style="height: 200px;"><canvas id="nonMophGauge"></canvas>
+                                <div class="gauge-text text-danger" id="nonMophGaugeText">0.00%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm h-100 rounded-4">
+                        <div class="card-body p-4">
+                            <h6 class="fw-bold text-primary mb-3">ร้อยละการเบิกจ่าย เงินนอก สป. (Top 10 กลุ่มงาน)</h6>
+                            <div style="height: 250px;"><canvas id="nonMophBar"></canvas></div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- Search Page -->
         <div id="search-page" class="page-section d-none fade-in">
             <div class="mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
-                        <h3 class="fw-bold text-dark mb-0"><i
-                                class="fas fa-search text-primary me-2"></i>ระบบสืบค้นแผนปฏิบัติ</h3>
+                        <h3 class="fw-bold text-dark mb-0"><i class="fas fa-search text-primary me-2"></i>ระบบสืบค้นแผนปฏิบัติ</h3>
                         <small class="text-muted">ระบบสืบค้นแผนปฏิบัติ</small>
                     </div>
-
-                    <button class="btn btn-success shadow-sm px-4 py-2 rounded-pill fw-bold"
-                        onclick="exportToExcel('searchTableBody', 'ข้อมูลค้นหา_AP')">
+                    
+                    <button class="btn btn-success shadow-sm px-4 py-2 rounded-pill fw-bold" onclick="exportToExcel('searchTableBody', 'ข้อมูลค้นหา_AP')">
                         <i class="fas fa-file-excel me-2"></i>ส่งออก Excel
                     </button>
                 </div>
@@ -362,22 +449,17 @@
                             </select>
                         </div>
                     </div>
-
+                    
                     <div class="row g-2 align-items-center">
                         <div class="col-12 col-md-11">
                             <div class="input-group input-group-sm shadow-sm">
-                                <span class="input-group-text bg-white border-end-0"><i
-                                        class="fas fa-search text-muted"></i></span>
-                                <input type="text" id="searchKeyword" class="form-control border-start-0 ps-0"
-                                    placeholder="พิมพ์คำค้นหา (ค้นหาจาก ชื่อโครงการ, กิจกรรมหลัก, กิจกรรมย่อย)..."
-                                    onkeyup="if(event.keyCode===13) runSearch()">
+                                <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                                <input type="text" id="searchKeyword" class="form-control border-start-0 ps-0" placeholder="พิมพ์คำค้นหา (ค้นหาจาก ชื่อโครงการ, กิจกรรมหลัก, กิจกรรมย่อย)..." onkeyup="if(event.keyCode===13) runSearch()">
                             </div>
                         </div>
                         <div class="col-12 col-md-1 d-flex gap-1">
-                            <button class="btn btn-sm btn-primary flex-grow-1 shadow-sm" onclick="runSearch()"
-                                title="ค้นหา"><i class="fas fa-search"></i></button>
-                            <button class="btn btn-sm btn-light border flex-grow-1 shadow-sm" onclick="resetSearch()"
-                                title="ล้างค่า"><i class="fas fa-undo"></i></button>
+                            <button class="btn btn-sm btn-primary flex-grow-1 shadow-sm" onclick="runSearch()" title="ค้นหา"><i class="fas fa-search"></i></button>
+                            <button class="btn btn-sm btn-light border flex-grow-1 shadow-sm" onclick="resetSearch()" title="ล้างค่า"><i class="fas fa-undo"></i></button>
                         </div>
                     </div>
 
@@ -385,23 +467,25 @@
             </div>
 
             <!-- search page summary card -->
-            <div
-                class="alert alert-light border shadow-sm py-2 px-3 mb-3 d-flex flex-wrap align-items-center justify-content-between rounded-3">
+            <div class="alert alert-light border shadow-sm py-2 px-3 mb-3 d-flex flex-wrap align-items-center justify-content-between rounded-3">
                 <div class="text-dark fw-bold mb-2 mb-md-0">
                     <i class="fas fa-search text-primary me-2"></i>สรุปผลการค้นหา
                 </div>
                 <div class="d-flex flex-wrap gap-4 small fw-bold">
                     <div class="text-secondary">
-                        <i class="fas fa-project-diagram me-1"></i>จำนวน: <span id="sum-count"
-                            class="text-dark fs-6 ms-1">0</span> โครงการ
+                        <i class="fas fa-project-diagram me-1"></i>จำนวน: <span id="sum-count" class="text-dark fs-6 ms-1">0</span> โครงการ
                     </div>
                     <div class="text-info">
-                        <i class="fas fa-clipboard-check me-1"></i>รวมอนุมัติ: <span id="sum-approved"
-                            class="text-dark fs-6 ms-1">0.00</span> บาท
+                        <i class="fas fa-clipboard-check me-1"></i>รวมอนุมัติ: <span id="sum-approved" class="text-dark fs-6 ms-1">0.00</span> บาท
                     </div>
                     <div class="text-success">
-                        <i class="fas fa-hand-holding-usd me-1"></i>รวมจัดสรร: <span id="sum-allocated"
-                            class="text-dark fs-6 ms-1">0.00</span> บาท
+                        <i class="fas fa-hand-holding-usd me-1"></i>รวมจัดสรร: <span id="sum-allocated" class="text-dark fs-6 ms-1">0.00</span> บาท
+                    </div>
+                    <div class="text-danger">
+                        <i class="fas fa-file-invoice-dollar me-1"></i>รวมเบิกจ่าย: <span id="sum-spent" class="text-dark fs-6 ms-1">0.00</span> บาท
+                    </div>
+                    <div class="text-primary">
+                        <i class="fas fa-wallet me-1"></i>รวมคงเหลือ: <span id="sum-balance" class="text-dark fs-6 ms-1">0.00</span> บาท
                     </div>
                 </div>
             </div>
@@ -429,17 +513,16 @@
             </div>
         </div>
 
+        <!-- แผนงานประจำปี Page -->
         <div id="yearly-page" class="page-section d-none fade-in">
             <div class="mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
-                        <h3 class="fw-bold text-dark mb-0"><i class="fas fa-search text-primary me-2"></i>แผนงานประจำปี
-                        </h3>
+                        <h3 class="fw-bold text-dark mb-0"><i class="fas fa-search text-primary me-2"></i>แผนงานประจำปี</h3>
                         <small class="text-muted">แผนงานประจำปี</small>
                     </div>
-
-                    <button class="btn btn-success shadow-sm px-4 py-2 rounded-pill fw-bold"
-                        onclick="exportToExcel('yearlyTableBody', 'ข้อมูลค้นหา_AP')">
+                    
+                    <button class="btn btn-success shadow-sm px-4 py-2 rounded-pill fw-bold" onclick="exportToExcel('yearlyTableBody', 'ข้อมูลค้นหา_AP')">
                         <i class="fas fa-file-excel me-2"></i>ส่งออก Excel
                     </button>
                 </div>
@@ -490,10 +573,10 @@
                         <div class="col-md-2">
                             <div class="d-flex gap-1">
                                 <button class="btn btn-success w-100" onclick="loadYearlyData()">
-                                    <i class="fas fa-search"></i>
+                                  <i class="fas fa-search"></i>
                                 </button>
                                 <button class="btn btn-secondary w-100" onclick="resetYearly()">
-                                    <i class="fas fa-refresh"></i>
+                                  <i class="fas fa-refresh"></i>
                                 </button>
                             </div>
                         </div>
@@ -502,23 +585,19 @@
             </div>
 
             <!-- yearly summary card -->
-            <div
-                class="alert alert-light border shadow-sm py-2 px-3 mb-3 d-flex flex-wrap align-items-center justify-content-between rounded-3">
+            <div class="alert alert-light border shadow-sm py-2 px-3 mb-3 d-flex flex-wrap align-items-center justify-content-between rounded-3">
                 <div class="text-dark fw-bold mb-2 mb-md-0">
                     <i class="fas fa-chart-bar text-primary me-2"></i>สรุปผลแผนงานประจำปี
                 </div>
                 <div class="d-flex flex-wrap gap-4 small fw-bold">
                     <div class="text-secondary">
-                        <i class="fas fa-project-diagram me-1"></i>จำนวน: <span id="yearly-count"
-                            class="text-dark fs-6 ms-1">0</span> โครงการ
+                        <i class="fas fa-project-diagram me-1"></i>จำนวน: <span id="yearly-count" class="text-dark fs-6 ms-1">0</span> โครงการ
                     </div>
                     <div class="text-success">
-                        <i class="fas fa-hand-holding-usd me-1"></i>รวมจัดสรร: <span id="yearly-allocated"
-                            class="text-dark fs-6 ms-1">0.00</span> บาท
+                        <i class="fas fa-hand-holding-usd me-1"></i>รวมจัดสรร: <span id="yearly-allocated" class="text-dark fs-6 ms-1">0.00</span> บาท
                     </div>
                     <div class="text-danger">
-                        <i class="fas fa-file-invoice-dollar me-1"></i>รวมเบิกจ่าย: <span id="yearly-spent"
-                            class="text-dark fs-6 ms-1">0.00</span> บาท
+                        <i class="fas fa-file-invoice-dollar me-1"></i>รวมเบิกจ่าย: <span id="yearly-spent" class="text-dark fs-6 ms-1">0.00</span> บาท
                     </div>
                 </div>
             </div>
@@ -556,8 +635,7 @@
                         <p class="text-muted small mb-0">ประวัติการเบิกจ่าย (Budget Disbursement History)</p>
                     </div>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-success shadow-sm px-3 py-2 rounded-pill"
-                            onclick="exportToExcel('tableTxHistoryNew', 'ประวัติการเบิกจ่าย')">
+                        <button class="btn btn-success shadow-sm px-3 py-2 rounded-pill" onclick="exportToExcel('tableTxHistoryNew', 'ประวัติการเบิกจ่าย')">
                             <i class="fas fa-file-excel me-2"></i>ส่งออก Excel
                         </button>
                         <button class="btn btn-primary shadow-sm px-4 py-2 rounded-pill" onclick="openTxModal()">
@@ -643,8 +721,7 @@
                         <p class="text-muted small mb-0">ประวัติการยืมเงิน (Loan History)</p>
                     </div>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-success shadow-sm px-3 py-2 rounded-pill"
-                            onclick="exportToExcel('tableLoanHistory', 'ประวัติเงินยืม')">
+                        <button class="btn btn-success shadow-sm px-3 py-2 rounded-pill" onclick="exportToExcel('tableLoanHistory', 'ประวัติเงินยืม')">
                             <i class="fas fa-file-excel me-2"></i>ส่งออก Excel
                         </button>
                         <button class="btn btn-primary shadow-sm px-4 py-2 rounded-pill" onclick="openLoanModal()">
@@ -729,11 +806,10 @@
                         <p class="text-muted small mb-0">บันทึกและตรวจสอบประวัติการจัดสรรงบประมาณ</p>
                     </div>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-success shadow-sm px-3 py-2 rounded-pill"
-                            onclick="exportToExcel('tableMasterPlan', 'ข้อมูลจัดสรรงบประมาณ')">
+                        <button class="btn btn-success shadow-sm px-3 py-2 rounded-pill" onclick="exportToExcel('tableMasterPlan', 'ข้อมูลจัดสรรงบประมาณ')">
                             <i class="fas fa-file-excel me-2"></i>ส่งออก Excel
                         </button>
-
+                        
                         <button class="btn btn-primary shadow-sm px-4 py-2 rounded-pill" onclick="openAllocModal()">
                             <i class="fas fa-plus-circle me-2"></i>จัดสรรงบประมาณ
                         </button>
@@ -781,15 +857,14 @@
                 <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0" id="tableAllocHistory"
-                                style="width:100%">
+                            <table class="table table-hover align-middle mb-0" id="tableAllocHistory" style="width:100%">
                                 <thead class="bg-warning text-dark">
                                     <tr>
                                         <th class="text-center" style="width: 50px;">ลำดับ</th>
-                                        <th class="ps-4 py-3 text-nowrap">วันที่จัดสรร</th>
-                                        <th class="text-nowrap">กลุ่มงาน/งาน</th>
-                                        <th style="min-width: 350px;">รายละเอียดโครงการ / กิจกรรม</th>
-                                        <th class="text-nowrap">เลขหนังสือ</th>
+                                        <th class="ps-4 py-3 text-nowrap">วันที่จัดสรร / เลขหนังสือ</th>
+                                        <th class="text-wrap" style="min-width: 150px; width: 20%;">กลุ่มงาน/งาน</th>
+                                        <!-- <th style="min-width: 350px; width: 75%;">รายละเอียดโครงการ / กิจกรรม</th> -->
+                                        <th>รายละเอียดโครงการ / กิจกรรม</th>
                                         <th class="text-end text-nowrap">จัดสรร (เดิม)</th>
                                         <th class="text-end text-nowrap">จัดสรรครั้งนี้</th>
                                         <th class="text-end pe-4 text-nowrap">ยอดจัดสรรรวม</th>
@@ -805,190 +880,173 @@
         </div>
 
         <div id="tracking-page" class="page-section d-none fade-in">
-            <div class="mb-4">
-                <h3 class="fw-bold text-dark"><i class="fas fa-stream me-2 text-info"></i>ติดตามความก้าวหน้าโครงการ
-                    (Project Tracking)</h3>
-                <span class="text-muted">เปรียบเทียบระยะเวลาตามแผนปฏิบัติการ (Plan) และผลการดำเนินงานจริง
-                    (Actual)</span>
-            </div>
+          <div class="mb-4">
+              <h3 class="fw-bold text-dark"><i class="fas fa-stream me-2 text-info"></i>ติดตามความก้าวหน้าโครงการ (Project Tracking)</h3>
+              <span class="text-muted">เปรียบเทียบระยะเวลาตามแผนปฏิบัติการ (Plan) และผลการดำเนินงานจริง (Actual)</span>
+          </div>
 
-            <!-- <div class="card border-0 shadow-sm mb-4 bg-light rounded-4 sticky-lg-top" style="top: 75px; z-index: 1020;"> -->
-            <div class="card border-0 shadow-sm mb-4 bg-light border-start border-4 border-success rounded-4">
-                <div class="card-body p-4">
-                    <div class="row g-3 mb-4 align-items-end">
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold text-muted small"><i class="fas fa-filter me-1"></i>
-                                กรองตามกลุ่มงาน/งาน</label>
-                            <select class="form-select border-primary shadow-sm" id="trackingDeptFilter"
-                                onchange="processTrackingLogic()">
-                                <option value="">-- แสดงทุกกลุ่มงาน (ภาพรวมทั้งหมด) --</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold text-muted small">ประเภทงบประมาณ</label>
-                            <select class="form-select border-primary shadow-sm" id="trackingTypeFilter"
-                                onchange="processTrackingLogic()">
-                                <option value="เงินนอก สป." selected>เงินนอก สป.</option>
-                                <option value="สป.สธ.">สป.สธ.</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold text-muted small">แหล่งงบประมาณ</label>
-                            <select class="form-select border-primary shadow-sm" id="trackingSourceFilter"
-                                onchange="processTrackingLogic()">
-                                <option value="">-- ทุกแหล่งงบประมาณ --</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <button class="btn btn-secondary w-100 shadow-sm fw-bold" onclick="resetTrackingFilter()"
-                                title="ล้างค่าตัวกรอง">
-                                <i class="fas fa-sync-alt me-1"></i> ล้างค่า
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="row row-cols-1 row-cols-md-5 g-3">
-                        <div class="col">
-                            <div class="card border-0 shadow-sm h-100 border-start border-4 border-secondary">
-                                <div class="card-body p-3">
-                                    <div class="text-muted small fw-bold mb-1">จำนวนโครงการ/กิจกรรม</div>
-                                    <h4 class="fw-bold mb-0 text-dark" id="trkCount">0</h4>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
-                                <div class="card-body p-3">
-                                    <div class="text-muted small fw-bold mb-1">จัดสรร (สป.สธ.)</div>
-                                    <h5 class="fw-bold mb-0 text-success" id="trkAllocMoph">0.00</h5>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
-                                <div class="card-body p-3">
-                                    <div class="text-muted small fw-bold mb-1">เบิกจ่าย (สป.สธ.)</div>
-                                    <h5 class="fw-bold mb-0 text-primary" id="trkSpentMoph">0.00</h5>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
-                                <div class="card-body p-3">
-                                    <div class="text-muted small fw-bold mb-1">จัดสรร (เงินบำรุงฯ)</div>
-                                    <h5 class="fw-bold mb-0 text-warning" id="trkAllocLoei">0.00</h5>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="card border-0 shadow-sm h-100 border-start border-4 border-danger">
-                                <div class="card-body p-3">
-                                    <div class="text-muted small fw-bold mb-1">เบิกจ่าย (เงินบำรุงฯ)</div>
-                                    <h5 class="fw-bold mb-0 text-danger" id="trkSpentLoei">0.00</h5>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+      <!-- <div class="card border-0 shadow-sm mb-4 bg-light rounded-4 sticky-lg-top" style="top: 75px; z-index: 1020;"> -->
+      <div class="card border-0 shadow-sm mb-4 bg-light border-start border-4 border-success rounded-4">
+        <div class="card-body p-4">
+            <div class="row g-3 mb-4 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-muted small"><i class="fas fa-filter me-1"></i> กรองตามกลุ่มงาน/งาน</label>
+                    <select class="form-select border-primary shadow-sm" id="trackingDeptFilter" onchange="processTrackingLogic()">
+                        <option value="">-- แสดงทุกกลุ่มงาน (ภาพรวมทั้งหมด) --</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-muted small">ประเภทงบประมาณ</label>
+                    <select class="form-select border-primary shadow-sm" id="trackingTypeFilter" onchange="processTrackingLogic()">
+                        <option value="เงินนอก สป." selected>เงินนอก สป.</option>
+                        <option value="สป.สธ.">สป.สธ.</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-muted small">แหล่งงบประมาณ</label>
+                    <select class="form-select border-primary shadow-sm" id="trackingSourceFilter" onchange="processTrackingLogic()">
+                        <option value="">-- ทุกแหล่งงบประมาณ --</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-secondary w-100 shadow-sm fw-bold" onclick="resetTrackingFilter()" title="ล้างค่าตัวกรอง">
+                        <i class="fas fa-sync-alt me-1"></i> ล้างค่า
+                    </button>
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm mb-4 border-start border-4 border-danger rounded-4">
-                <div class="card-header bg-white fw-bold text-danger py-3 border-0">
-                    <i class="fas fa-tasks me-2"></i> สถานะการดำเนินงานรายกลุ่มงาน
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0 text-center">
-                            <thead class="table-light text-secondary">
-                                <tr>
-                                    <th class="text-start ps-4">กลุ่มงาน</th>
-                                    <th>โครงการที่ต้องติดตาม</th>
-                                    <th>ดำเนินการตามแผน</th>
-                                    <th>ช่วงเวลาแผน (เริ่ม-สิ้นสุด)</th>
-                                    <th>สถานะความล่าช้า</th>
-                                </tr>
-                            </thead>
-                            <tbody id="trackingAlertBody">
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Header Gantt Chart -->
-            <div class="card border-0 shadow-sm rounded-4 mt-4 border-start border-4 border-info">
-                <div class="card-header bg-white border-0 pt-4 px-4">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                        <h5 class="fw-bold text-dark mb-0">
-                            <i class="fas fa-chart-gantt text-primary me-2"></i>แผนภูมิการดำเนินงาน (Gantt Chart)
-                        </h5>
-                        <div class="d-flex gap-3 small fw-bold">
-                            <div class="d-flex align-items-center"><span class="badge rounded-circle me-1"
-                                    style="background:#1a237e; width:10px; height:10px; padding:0;">&nbsp;</span>
-                                กลุ่มงาน</div>
-                            <div class="d-flex align-items-center"><span class="badge rounded-circle me-1"
-                                    style="background:#0d6efd; width:10px; height:10px; padding:0;">&nbsp;</span> ตามแผน
-                            </div>
-                            <div class="d-flex align-items-center"><span class="badge rounded-circle me-1"
-                                    style="background:#dc3545; width:10px; height:10px; padding:0;">&nbsp;</span> ล่าช้า
-                            </div>
-                            <div class="d-flex align-items-center"><span class="badge rounded-circle me-1"
-                                    style="background:#198754; width:10px; height:10px; padding:0;">&nbsp;</span>
-                                สำเร็จ/สิ้นสุด</div>
-                        </div>
-                    </div>
-                    <div class="row g-0 bg-light rounded-3 py-2 px-3 border border-dashed">
-                        <div class="col text-center border-end">
-                            <div class="text-muted small fw-bold text-uppercase">โครงการทั้งหมด</div>
-                            <div class="h5 mb-0 fw-bold text-primary" id="mini-total-proj">0</div>
-                        </div>
-                        <div class="col text-center border-end">
-                            <div class="text-muted small fw-bold text-uppercase">สถานะล่าช้า</div>
-                            <div class="h5 mb-0 fw-bold text-danger" id="mini-delayed-proj">0</div>
-                        </div>
-                        <div class="col text-center">
-                            <div class="text-muted small fw-bold text-uppercase">งบประมาณจัดสรรรวม</div>
-                            <div class="h5 mb-0 fw-bold text-dark"><span id="mini-total-budget">0.00</span> <small
-                                    class="text-muted">฿</small></div>
+            <div class="row row-cols-1 row-cols-md-5 g-3">
+                <div class="col">
+                    <div class="card border-0 shadow-sm h-100 border-start border-4 border-secondary">
+                        <div class="card-body p-3">
+                            <div class="text-muted small fw-bold mb-1">จำนวนโครงการ/กิจกรรม</div>
+                            <h4 class="fw-bold mb-0 text-dark" id="trkCount">0</h4>
                         </div>
                     </div>
                 </div>
-                <div class="card-body p-4">
-                    <div id="gantt_here"
-                        style="width:100%; height:550px; border-radius: 8px; border: 1px solid #f0f0f0;"></div>
-                </div>
-            </div>
-            <!-- Header Gantt Chart -->
-
-        </div>
-
-        <div class="modal fade" id="modalDeptTracking" tabindex="-1">
-            <div class="modal-dialog modal-xl modal-dialog-centered">
-                <div class="modal-content rounded-4 border-0 shadow">
-                    <div class="modal-header border-0 pb-0">
-                        <h5 class="fw-bold" id="modalDeptTitle">รายละเอียดโครงการ</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="col">
+                    <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
+                        <div class="card-body p-3">
+                            <div class="text-muted small fw-bold mb-1">จัดสรร (สป.สธ.)</div>
+                            <h5 class="fw-bold mb-0 text-success" id="trkAllocMoph">0.00</h5>
+                        </div>
                     </div>
-                    <div class="modal-body p-4">
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-hover small">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th class="text-center" style="width: 5%;">ลำดับ</th>
-                                        <th style="width: 40%;">ชื่อโครงการ/กิจกรรม</th>
-                                        <th class="text-end" style="width: 15%;">จัดสรร</th>
-                                        <th class="text-end" style="width: 15%;">เบิกจ่าย</th>
-                                        <th class="text-center" style="width: 10%;">แผน (เดือน)</th>
-                                        <th class="text-center" style="width: 15%;">สถานะจริง</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="modalDeptTableBody"></tbody>
-                            </table>
+                </div>
+                <div class="col">
+                    <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
+                        <div class="card-body p-3">
+                            <div class="text-muted small fw-bold mb-1">เบิกจ่าย (สป.สธ.)</div>
+                            <h5 class="fw-bold mb-0 text-primary" id="trkSpentMoph">0.00</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
+                        <div class="card-body p-3">
+                            <div class="text-muted small fw-bold mb-1">จัดสรร (เงินบำรุงฯ)</div>
+                            <h5 class="fw-bold mb-0 text-warning" id="trkAllocLoei">0.00</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card border-0 shadow-sm h-100 border-start border-4 border-danger">
+                        <div class="card-body p-3">
+                            <div class="text-muted small fw-bold mb-1">เบิกจ่าย (เงินบำรุงฯ)</div>
+                            <h5 class="fw-bold mb-0 text-danger" id="trkSpentLoei">0.00</h5>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4 border-start border-4 border-danger rounded-4">
+        <div class="card-header bg-white fw-bold text-danger py-3 border-0">
+            <i class="fas fa-tasks me-2"></i> สถานะการดำเนินงานรายกลุ่มงาน
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 text-center">
+                    <thead class="table-light text-secondary">
+                        <tr>
+                            <th class="text-start ps-4">กลุ่มงาน</th>
+                            <th>โครงการที่ต้องติดตาม</th>
+                            <th>ดำเนินการตามแผน</th>
+                            <th>ช่วงเวลาแผน (เริ่ม-สิ้นสุด)</th>
+                            <th>สถานะความล่าช้า</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trackingAlertBody">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header Gantt Chart -->
+    <div class="card border-0 shadow-sm rounded-4 mt-4 border-start border-4 border-info">
+        <div class="card-header bg-white border-0 pt-4 px-4">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <h5 class="fw-bold text-dark mb-0">
+                    <i class="fas fa-chart-gantt text-primary me-2"></i>แผนภูมิการดำเนินงาน (Gantt Chart)
+                </h5>
+                <div class="d-flex gap-3 small fw-bold">
+                    <div class="d-flex align-items-center"><span class="badge rounded-circle me-1" style="background:#1a237e; width:10px; height:10px; padding:0;">&nbsp;</span> กลุ่มงาน</div>
+                    <div class="d-flex align-items-center"><span class="badge rounded-circle me-1" style="background:#0d6efd; width:10px; height:10px; padding:0;">&nbsp;</span> ตามแผน</div>
+                    <div class="d-flex align-items-center"><span class="badge rounded-circle me-1" style="background:#dc3545; width:10px; height:10px; padding:0;">&nbsp;</span> ล่าช้า</div>
+                    <div class="d-flex align-items-center"><span class="badge rounded-circle me-1" style="background:#198754; width:10px; height:10px; padding:0;">&nbsp;</span> สำเร็จ/สิ้นสุด</div>
+                </div>
+            </div>
+            <div class="row g-0 bg-light rounded-3 py-2 px-3 border border-dashed">
+                <div class="col text-center border-end">
+                    <div class="text-muted small fw-bold text-uppercase">โครงการทั้งหมด</div>
+                    <div class="h5 mb-0 fw-bold text-primary" id="mini-total-proj">0</div>
+                </div>
+                <div class="col text-center border-end">
+                    <div class="text-muted small fw-bold text-uppercase">สถานะล่าช้า</div>
+                    <div class="h5 mb-0 fw-bold text-danger" id="mini-delayed-proj">0</div>
+                </div>
+                <div class="col text-center">
+                    <div class="text-muted small fw-bold text-uppercase">งบประมาณจัดสรรรวม</div>
+                    <div class="h5 mb-0 fw-bold text-dark"><span id="mini-total-budget">0.00</span> <small class="text-muted">฿</small></div>
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-4">
+            <div id="gantt_here" style="width:100%; height:550px; border-radius: 8px; border: 1px solid #f0f0f0;"></div>
+        </div>
+    </div>
+    <!-- Header Gantt Chart -->
+
+</div>
+
+<div class="modal fade" id="modalDeptTracking" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="fw-bold" id="modalDeptTitle">รายละเอียดโครงการ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover small">
+                        <thead class="table-dark">
+                            <tr>
+                                <th class="text-center" style="width: 5%;">ลำดับ</th>
+                                <th style="width: 40%;">ชื่อโครงการ/กิจกรรม</th>
+                                <th class="text-end" style="width: 15%;">จัดสรร</th>
+                                <th class="text-end" style="width: 15%;">เบิกจ่าย</th>
+                                <th class="text-center" style="width: 10%;">แผน (เดือน)</th>
+                                <th class="text-center" style="width: 15%;">สถานะจริง</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalDeptTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
         <?!= include('summary'); ?>
         <?!= include('auth_ui'); ?>
@@ -998,13 +1056,12 @@
                 class="fas fa-arrow-up"></i></button>
 
     </div>
-
+    
     <div class="modal fade" id="repaymentModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title fw-bold"><i class="fas fa-check-circle me-2"></i>บันทึกคืนเงินยืม/ล้างหนี้
-                    </h5>
+                    <h5 class="modal-title fw-bold"><i class="fas fa-check-circle me-2"></i>บันทึกคืนเงินยืม/ล้างหนี้</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body px-4">
@@ -1041,34 +1098,28 @@
                             <div class="mb-3">
                                 <label class="form-label fw-bold text-success">1. ยอดใช้จ่ายจริง (ตามใบเสร็จ)</label>
                                 <div class="input-group">
-                                    <span class="input-group-text bg-white border-success text-success"><i
-                                            class="fas fa-receipt"></i></span>
-                                    <input type="number" class="form-control border-success fw-bold"
-                                        id="repayActualSpent" placeholder="0.00" required>
+                                    <span class="input-group-text bg-white border-success text-success"><i class="fas fa-receipt"></i></span>
+                                    <input type="number" class="form-control border-success fw-bold" id="repayActualSpent" placeholder="0.00" required>
                                 </div>
                             </div>
 
                             <div class="mb-0">
                                 <label class="form-label fw-bold text-primary">2. ยอดเงินทอน (ส่งคืนโครงการ)</label>
                                 <div class="input-group">
-                                    <span class="input-group-text bg-white border-primary text-primary"><i
-                                            class="fas fa-hand-holding-usd"></i></span>
-                                    <input type="number" class="form-control border-primary fw-bold"
-                                        id="repayReturnedAmount" placeholder="0.00" required>
+                                    <span class="input-group-text bg-white border-primary text-primary"><i class="fas fa-hand-holding-usd"></i></span>
+                                    <input type="number" class="form-control border-primary fw-bold" id="repayReturnedAmount" placeholder="0.00" required>
                                 </div>
                             </div>
                         </div>
                     </div>
-
+                    
                     <div class="alert alert-info py-2 small mb-0">
                         <i class="fas fa-info-circle me-1"></i> <b>หมายเหตุ:</b> ยอดรวม (1+2) ต้องไม่เกินยอดเงินยืม
                     </div>
                 </div>
                 <div class="modal-footer bg-light border-0">
-                    <button type="button" class="btn btn-secondary px-4 rounded-pill"
-                        data-bs-dismiss="modal">ยกเลิก</button>
-                    <button type="button" class="btn btn-success px-4 rounded-pill fw-bold" id="btnSaveRepayment"
-                        onclick="submitRepayment()">
+                    <button type="button" class="btn btn-secondary px-4 rounded-pill" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="button" class="btn btn-success px-4 rounded-pill fw-bold" id="btnSaveRepayment" onclick="submitRepayment()">
                         <i class="fas fa-save me-2"></i>ยืนยันการคืนเงิน
                     </button>
                 </div>
@@ -1116,41 +1167,31 @@
 
                     <div id="allocInfoBox" class="card border-primary border-opacity-25 shadow-sm mb-3 d-none">
                         <div class="card-body bg-primary bg-opacity-10 p-3">
-
+                            
                             <div class="mb-2">
-                                <div id="info_proj_name" class="fw-bold text-dark mb-1 text-wrap"
-                                    style="font-size: 1.05rem; line-height: 1.4;">-</div>
-                                <div id="info_act_name" class="text-secondary fw-bold text-wrap mb-1"
-                                    style="font-size: 0.85rem;">
+                                <div id="info_proj_name" class="fw-bold text-dark mb-1 text-wrap" style="font-size: 1.05rem; line-height: 1.4;">-</div>
+                                <div id="info_act_name" class="text-secondary fw-bold text-wrap mb-1" style="font-size: 0.85rem;">
                                     <i class="fas fa-caret-right me-2 text-primary opacity-75"></i><span>-</span>
                                 </div>
-                                <div id="info_sub_name_container" class="text-secondary fw-bold text-wrap d-none"
-                                    style="font-size: 0.8rem;">
-                                    <i class="fas fa-angle-double-right me-2 ms-4 text-primary opacity-75"></i><span
-                                        id="info_sub_name">-</span>
+                                <div id="info_sub_name_container" class="text-secondary fw-bold text-wrap d-none" style="font-size: 0.8rem;">
+                                    <i class="fas fa-angle-double-right me-2 ms-4 text-primary opacity-75"></i><span id="info_sub_name">-</span>
                                 </div>
                             </div>
 
                             <div class="mb-3 d-flex flex-wrap gap-1" id="info_badges">
-                                <span class="badge bg-primary px-2 py-1 shadow-sm fw-normal" style="font-size: 0.75rem;"
-                                    id="info_type">-</span>
-                                <span class="badge bg-light text-dark border px-2 py-1 shadow-sm fw-normal"
-                                    style="font-size: 0.75rem;" id="info_source">-</span>
-                                <span class="badge bg-secondary px-2 py-1 shadow-sm fw-normal d-none"
-                                    style="font-size: 0.75rem;" id="info_budget_code"></span>
-                                <span class="badge bg-secondary px-2 py-1 shadow-sm fw-normal d-none"
-                                    style="font-size: 0.75rem;" id="info_act_code"></span>
+                                <span class="badge bg-primary px-2 py-1 shadow-sm fw-normal" style="font-size: 0.75rem;" id="info_type">-</span>
+                                <span class="badge bg-light text-dark border px-2 py-1 shadow-sm fw-normal" style="font-size: 0.75rem;" id="info_source">-</span>
+                                <span class="badge bg-secondary px-2 py-1 shadow-sm fw-normal d-none" style="font-size: 0.75rem;" id="info_budget_code"></span>
+                                <span class="badge bg-secondary px-2 py-1 shadow-sm fw-normal d-none" style="font-size: 0.75rem;" id="info_act_code"></span>
                             </div>
 
                             <div class="row g-2 bg-white rounded-3 p-2 border shadow-sm mx-0">
                                 <div class="col-6 border-end">
-                                    <div class="small text-muted fw-bold mb-0" style="font-size: 0.75rem;">ยอดจัดสรรสะสม
-                                    </div>
+                                    <div class="small text-muted fw-bold mb-0" style="font-size: 0.75rem;">ยอดจัดสรรสะสม</div>
                                     <div class="h5 mb-0 fw-bold text-success mt-1" id="info_allocated">0.00</div>
                                 </div>
                                 <div class="col-6 ps-3">
-                                    <div class="small text-muted fw-bold mb-0" style="font-size: 0.75rem;">เบิกจ่ายสะสม
-                                    </div>
+                                    <div class="small text-muted fw-bold mb-0" style="font-size: 0.75rem;">เบิกจ่ายสะสม</div>
                                     <div class="h5 mb-0 fw-bold text-danger mt-1" id="info_spent">0.00</div>
                                 </div>
                             </div>
@@ -1229,156 +1270,104 @@
                                     </div>
                                 </div>
 
-                                <div id="txInfoBox"
-                                    class="card border-success border-opacity-25 shadow-sm mt-3 mb-0 d-none">
+                                <div id="txInfoBox" class="card border-success border-opacity-25 shadow-sm mt-3 mb-0 d-none">
                                     <div class="card-body bg-success bg-opacity-10 p-3">
-                                        <div
-                                            class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-success border-opacity-25">
+                                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-success border-opacity-25">
                                             <div>
-                                                <div class="small text-muted fw-bold mb-1">กลุ่มงาน: <span
-                                                        id="tx_disp_dept"
-                                                        class="badge bg-light text-dark border"></span></div>
-                                                <div class="fw-bold text-dark text-wrap"
-                                                    style="font-size: 0.95rem; line-height: 1.4;" id="tx_disp_proj">...
-                                                </div>
+                                                <div class="small text-muted fw-bold mb-1">กลุ่มงาน: <span id="tx_disp_dept" class="badge bg-light text-dark border"></span></div>
+                                                <div class="fw-bold text-dark text-wrap" style="font-size: 0.95rem; line-height: 1.4;" id="tx_disp_proj">...</div>
                                             </div>
                                         </div>
                                         <div class="row g-2 text-center mt-1">
                                             <div class="col-4 border-end">
-                                                <div class="small text-muted fw-bold" style="font-size: 0.75rem;">
-                                                    งบจัดสรร</div>
+                                                <div class="small text-muted fw-bold" style="font-size: 0.75rem;">งบจัดสรร</div>
                                                 <div class="h6 mb-0 fw-bold text-dark mt-1" id="tx_alloc">0.00</div>
                                             </div>
                                             <div class="col-4 border-end">
-                                                <div class="small text-muted fw-bold" style="font-size: 0.75rem;">
-                                                    เบิกจ่ายสะสม</div>
+                                                <div class="small text-muted fw-bold" style="font-size: 0.75rem;">เบิกจ่ายสะสม</div>
                                                 <div class="h6 mb-0 fw-bold text-warning mt-1" id="tx_spent">0.00</div>
                                             </div>
                                             <div class="col-4">
-                                                <div class="small text-muted fw-bold" style="font-size: 0.75rem;">
-                                                    งบคงเหลือ</div>
+                                                <div class="small text-muted fw-bold" style="font-size: 0.75rem;">งบคงเหลือ</div>
                                                 <div class="h5 mb-0 fw-bold text-success mt-1" id="tx_bal">0.00</div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                        </div>
 
-                            <div class="card border-0 shadow-sm">
-                                <div class="card-body p-3">
-                                    <div class="row g-3">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body p-3">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <input type="date" class="form-control" id="txDate">
+                                            <label>📅 วันที่เบิกจ่าย</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <input type="number" class="form-control fw-bold text-success" id="txAmount"
+                                                placeholder="0.00" step="0.01">
+                                            <label>💰 จำนวนเงิน (บาท)</label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="txAmountError" class="small text-danger fw-bold mt-1 d-none">❌ ยอดเบิกจ่ายเกินงบคงเหลือ!</div>
+
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <select class="form-select" id="txExpenseType">
+                                                <option value="ค่าจัดประชุม/อบรม">ค่าจัดประชุม/อบรม</option>
+                                                <option value="ค่าตอบแทน">ค่าตอบแทน</option>
+                                                <option value="ค่าตอบแทนนอกเวลาราชการ">ค่าตอบแทนนอกเวลาราชการ</option>
+                                                <option value="ค่าลงทะเบียน">ค่าลงทะเบียน</option>
+                                                <option value="ค่าใช้สอย">ค่าใช้สอย</option>
+                                                <option value="ค่าจ้างเหมา">ค่าจ้างเหมา</option>
+                                                <option value="ค่าใช้จ่ายการเดินทาง">ค่าใช้จ่ายการเดินทาง</option>
+                                                <option value="ค่าวัสดุ">ค่าวัสดุ</option>
+                                                <option value="ค่าครุภัณฑ์">ค่าครุภัณฑ์</option>
+                                                <option value="ค่าสาธารณูปโภค">ค่าสาธารณูปโภค</option>
+                                                <option value="อื่นๆ">อื่นๆ</option>
+                                            </select>
+                                            <label>📑 หมวดรายจ่าย</label>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <input type="text" class="form-control" id="txDesc"
+                                                placeholder="รายละเอียด">
+                                            <label>📝 รายละเอียด (ถ้ามี)</label>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mb-3 border-top pt-3 mt-3">
+                                        <div class="col-md-12"><small class="text-primary fw-bold"><i class="fas fa-clock me-1"></i> ข้อมูลระยะเวลาดำเนินกิจกรรมจริง (สำหรับ Gantt Chart)</small></div>
                                         <div class="col-md-6">
                                             <div class="form-floating">
-                                                <input type="date" class="form-control" id="txDate">
-                                                <label>📅 วันที่เบิกจ่าย</label>
+                                                <input type="date" class="form-control border-primary" id="txStartDate">
+                                                <label>📅 วันที่เริ่มดำเนินกิจกรรม</label>
                                             </div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="form-floating">
-                                                <input type="number" class="form-control fw-bold text-success"
-                                                    id="txAmount" placeholder="0.00" step="0.01">
-                                                <label>💰 จำนวนเงิน (บาท)</label>
+                                                <input type="date" class="form-control border-primary" id="txEndDate">
+                                                <label>📅 วันที่สิ้นสุดกิจกรรม</label>
                                             </div>
                                         </div>
+                                    </div>
 
-                                        <div id="txInfoBox"
-                                            class="card border-success border-opacity-25 shadow-sm mt-3 mb-0 d-none">
-                                            <div class="card-body bg-success bg-opacity-10 p-3">
-                                                <div
-                                                    class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-success border-opacity-25">
-                                                    <div>
-                                                        <div class="small text-muted fw-bold mb-1">กลุ่มงาน: <span
-                                                                id="tx_disp_dept"
-                                                                class="badge bg-light text-dark border"></span></div>
-                                                        <div class="fw-bold text-dark text-wrap"
-                                                            style="font-size: 0.95rem; line-height: 1.4;"
-                                                            id="tx_disp_proj">...</div>
-                                                    </div>
-                                                </div>
-                                                <div class="row g-2 text-center mt-1">
-                                                    <div class="col-4 border-end">
-                                                        <div class="small text-muted fw-bold"
-                                                            style="font-size: 0.75rem;">งบจัดสรร</div>
-                                                        <div class="h6 mb-0 fw-bold text-dark mt-1" id="tx_alloc">0.00
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-4 border-end">
-                                                        <div class="small text-muted fw-bold"
-                                                            style="font-size: 0.75rem;">เบิกจ่ายสะสม</div>
-                                                        <div class="h6 mb-0 fw-bold text-warning mt-1" id="tx_spent">
-                                                            0.00</div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <div class="small text-muted fw-bold"
-                                                            style="font-size: 0.75rem;">งบคงเหลือ</div>
-                                                        <div class="h5 mb-0 fw-bold text-success mt-1" id="tx_bal">0.00
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div id="txAmountError" class="small text-danger fw-bold mt-1 d-none">❌
-                                            ยอดเบิกจ่ายเกินงบคงเหลือ!</div>
-
-                                        <div class="col-md-6">
-                                            <div class="form-floating">
-                                                <select class="form-select" id="txExpenseType">
-                                                    <option value="ค่าจัดประชุม/อบรม">ค่าจัดประชุม/อบรม</option>
-                                                    <option value="ค่าตอบแทน">ค่าตอบแทน</option>
-                                                    <option value="ค่าตอบแทนนอกเวลาราชการ">ค่าตอบแทนนอกเวลาราชการ
-                                                    </option>
-                                                    <option value="ค่าลงทะเบียน">ค่าลงทะเบียน</option>
-                                                    <option value="ค่าใช้สอย">ค่าใช้สอย</option>
-                                                    <option value="ค่าจ้างเหมา">ค่าจ้างเหมา</option>
-                                                    <option value="ค่าใช้จ่ายการเดินทาง">ค่าใช้จ่ายการเดินทาง</option>
-                                                    <option value="ค่าวัสดุ">ค่าวัสดุ</option>
-                                                    <option value="ค่าครุภัณฑ์">ค่าครุภัณฑ์</option>
-                                                    <option value="ค่าสาธารณูปโภค">ค่าสาธารณูปโภค</option>
-                                                    <option value="อื่นๆ">อื่นๆ</option>
-                                                </select>
-                                                <label>📑 หมวดรายจ่าย</label>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-md-6">
-                                            <div class="form-floating">
-                                                <input type="text" class="form-control" id="txDesc"
-                                                    placeholder="รายละเอียด">
-                                                <label>📝 รายละเอียด (ถ้ามี)</label>
-                                            </div>
-                                        </div>
-
-                                        <div class="row g-3 mb-3 border-top pt-3 mt-3">
-                                            <div class="col-md-12"><small class="text-primary fw-bold"><i
-                                                        class="fas fa-clock me-1"></i> ข้อมูลระยะเวลาดำเนินกิจกรรมจริง
-                                                    (สำหรับ Gantt Chart)</small></div>
-                                            <div class="col-md-6">
-                                                <div class="form-floating">
-                                                    <input type="date" class="form-control border-primary"
-                                                        id="txStartDate">
-                                                    <label>📅 วันที่เริ่มดำเนินกิจกรรม</label>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-floating">
-                                                    <input type="date" class="form-control border-primary"
-                                                        id="txEndDate">
-                                                    <label>📅 วันที่สิ้นสุดกิจกรรม</label>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-12">
-                                            <div class="form-floating">
-                                                <input type="text" class="form-control" id="txRemark"
-                                                    placeholder="หมายเหตุ">
-                                                <label class="text-secondary">📌 หมายเหตุ</label>
-                                            </div>
+                                    <div class="col-12">
+                                        <div class="form-floating">
+                                            <input type="text" class="form-control" id="txRemark"
+                                                placeholder="หมายเหตุ">
+                                            <label class="text-secondary">📌 หมายเหตุ</label>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+                        </div>
                     </form>
                 </div>
                 <div class="modal-footer bg-light px-4 py-3">
@@ -1423,44 +1412,30 @@
                                     </div>
                                 </div>
 
-                                <div id="loanInfoBox"
-                                    class="card border-primary border-opacity-25 shadow-sm mt-3 mb-0 d-none">
+                                <div id="loanInfoBox" class="card border-primary border-opacity-25 shadow-sm mt-3 mb-0 d-none">
                                     <div class="card-body bg-primary bg-opacity-10 p-3">
-                                        <div
-                                            class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-primary border-opacity-25">
+                                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-primary border-opacity-25">
                                             <div>
-                                                <div class="small text-muted fw-bold mb-1">กลุ่มงาน: <span
-                                                        id="loan_disp_dept"
-                                                        class="badge bg-light text-dark border"></span></div>
-                                                <div class="fw-bold text-dark text-wrap"
-                                                    style="font-size: 0.95rem; line-height: 1.4;" id="loan_disp_proj">
-                                                    ...</div>
+                                                <div class="small text-muted fw-bold mb-1">กลุ่มงาน: <span id="loan_disp_dept" class="badge bg-light text-dark border"></span></div>
+                                                <div class="fw-bold text-dark text-wrap" style="font-size: 0.95rem; line-height: 1.4;" id="loan_disp_proj">...</div>
                                             </div>
                                         </div>
                                         <div class="row g-2 text-center mt-1">
                                             <div class="col-3 border-end">
-                                                <div class="small text-muted fw-bold" style="font-size: 0.7rem;">
-                                                    งบจัดสรร</div>
-                                                <div class="fw-bold text-dark mt-1" style="font-size: 0.85rem;"
-                                                    id="l_alloc">0.00</div>
+                                                <div class="small text-muted fw-bold" style="font-size: 0.7rem;">งบจัดสรร</div>
+                                                <div class="fw-bold text-dark mt-1" style="font-size: 0.85rem;" id="l_alloc">0.00</div>
                                             </div>
                                             <div class="col-3 border-end">
-                                                <div class="small text-muted fw-bold" style="font-size: 0.7rem;">
-                                                    เบิกจ่ายสะสม</div>
-                                                <div class="fw-bold text-warning mt-1" style="font-size: 0.85rem;"
-                                                    id="l_spent">0.00</div>
+                                                <div class="small text-muted fw-bold" style="font-size: 0.7rem;">เบิกจ่ายสะสม</div>
+                                                <div class="fw-bold text-warning mt-1" style="font-size: 0.85rem;" id="l_spent">0.00</div>
                                             </div>
                                             <div class="col-3 border-end">
-                                                <div class="small text-muted fw-bold" style="font-size: 0.7rem;">ยืมสะสม
-                                                </div>
-                                                <div class="fw-bold text-danger mt-1" style="font-size: 0.85rem;"
-                                                    id="l_loaned">0.00</div>
+                                                <div class="small text-muted fw-bold" style="font-size: 0.7rem;">ยืมสะสม</div>
+                                                <div class="fw-bold text-danger mt-1" style="font-size: 0.85rem;" id="l_loaned">0.00</div>
                                             </div>
                                             <div class="col-3">
-                                                <div class="small text-muted fw-bold" style="font-size: 0.7rem;">
-                                                    งบคงเหลือ</div>
-                                                <div class="fw-bold text-primary mt-1" style="font-size: 0.95rem;"
-                                                    id="l_bal">0.00</div>
+                                                <div class="small text-muted fw-bold" style="font-size: 0.7rem;">งบคงเหลือ</div>
+                                                <div class="fw-bold text-primary mt-1" style="font-size: 0.95rem;" id="l_bal">0.00</div>
                                             </div>
                                         </div>
                                     </div>
