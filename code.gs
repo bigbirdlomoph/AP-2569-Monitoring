@@ -3,7 +3,7 @@
 // ==========================================
 var SPREADSHEET_ID = '1BhZDqEU7XKhgYgYnBrbFI7IMbr_SLdhU8rvhAMddodQ';
 var SHEET_NAME = 'm_actionplan';
-var APP_VERSION = 'Version : 690514';
+var APP_VERSION = 'Version : 690519';
 
 // ==========================================
 // 📌 1.1 DYNAMIC COLUMN MAPPING (อัปเดตเพิ่ม 3 คอลัมน์ใหม่)

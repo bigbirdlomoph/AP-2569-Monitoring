@@ -55,7 +55,7 @@
 
             <div class="d-flex d-none d-lg-flex ms-4">
                 <a href="javascript:void(0)" class="nav-pill-btn active" onclick="switchPage('dashboard', this)">Dashboard</a>
-                <a href="javascript:void(0)" class="nav-pill-btn" onclick="switchPage('search', this)">ค้นหาแผนปฏิบัติ</a>
+                <a href="javascript:void(0)" class="nav-pill-btn" onclick="switchPage('search', this)">ค้นหาแผนฯ</a>
                 <a href="javascript:void(0)" class="nav-pill-btn" onclick="switchPage('yearly', this)">แผนงานประจำปี</a>
                 <a href="javascript:void(0)" class="nav-pill-btn" onclick="switchPage('summary', this)">รายงานสรุป</a>
                 <a href="javascript:void(0)" class="nav-pill-btn" onclick="switchPage('tracking', this)">ติดตามโครงการ</a>
@@ -391,8 +391,8 @@
             <div class="mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
-                        <h3 class="fw-bold text-dark mb-0"><i class="fas fa-search text-primary me-2"></i>ระบบสืบค้นแผนปฏิบัติ</h3>
-                        <small class="text-muted">ระบบสืบค้นแผนปฏิบัติ</small>
+                        <h3 class="fw-bold text-dark mb-0"><i class="fas fa-search text-primary me-2"></i>ระบบสืบค้นแผนปฏิบัติการพัฒนาสุขภาพ สำนักงานสาธารณสุขจังหวัดเลย</h3>
+                        <small class="text-muted">ระบบสืบค้นแผนปฏิบัติราชการ สสจ.เลย</small>
                     </div>
                     
                     <button class="btn btn-success shadow-sm px-4 py-2 rounded-pill fw-bold" onclick="exportToExcel('searchTableBody', 'ข้อมูลค้นหา_AP')">
@@ -403,7 +403,10 @@
             <div class="card border-0 shadow-sm mb-4 sticky-filter-panel">
                 <div class="card-body bg-light rounded-3 py-3">
                     <div class="row g-2 mb-2">
-                        <div class="col-12 col-md-3">
+                        <div class="col-12 col-md-1">
+                            <input type="text" id="searchOrder" class="form-control form-control-sm" placeholder="ลำดับ..." onkeyup="if(event.keyCode===13) runSearch()">
+                        </div>
+                        <div class="col-12 col-md-2">
                             <select id="searchDeptSelect" class="form-select form-select-sm" style="width: 100%;">
                                 <option value="">-- ทุกกลุ่มงาน --</option>
                             </select>
@@ -415,37 +418,19 @@
                                 <option value="NONMOPH">เงินนอก สป.</option>
                             </select>
                         </div>
-
                         <div class="col-12 col-md-2">
                             <select id="searchSource" class="form-select form-select-sm">
                                 <option value="">-- ทุกแหล่งงบ --</option>
                             </select>
                         </div>
-
                         <div class="col-12 col-md-2">
-                            <select id="searchQuarter" class="form-select form-select-sm">
-                                <option value="">-- ทุกไตรมาส --</option>
-                                <option value="Q1">ไตรมาส 1 (ต.ค.-ธ.ค.)</option>
-                                <option value="Q2">ไตรมาส 2 (ม.ค.-มี.ค.)</option>
-                                <option value="Q3">ไตรมาส 3 (เม.ย.-มิ.ย.)</option>
-                                <option value="Q4">ไตรมาส 4 (ก.ค.-ก.ย.)</option>
+                            <select id="searchBudgetCode" class="form-select form-select-sm" style="width: 100%;">
+                                <option value="">-- ทุกรหัสงบประมาณ --</option>
                             </select>
                         </div>
-                        <div class="col-12 col-md-2">
-                            <select id="searchMonth" class="form-select form-select-sm">
-                                <option value="">-- ทุกเดือน --</option>
-                                <option value="0">ต.ค.</option>
-                                <option value="1">พ.ย.</option>
-                                <option value="2">ธ.ค.</option>
-                                <option value="3">ม.ค.</option>
-                                <option value="4">ก.พ.</option>
-                                <option value="5">มี.ค.</option>
-                                <option value="6">เม.ย.</option>
-                                <option value="7">พ.ค.</option>
-                                <option value="8">มิ.ย.</option>
-                                <option value="9">ก.ค.</option>
-                                <option value="10">ส.ค.</option>
-                                <option value="11">ก.ย.</option>
+                        <div class="col-12 col-md-3">
+                            <select id="searchActCode" class="form-select form-select-sm" style="width: 100%;">
+                                <option value="">-- ทุกรหัสกิจกรรม --</option>
                             </select>
                         </div>
                     </div>
@@ -498,12 +483,10 @@
                                 <tr>
                                     <th class="ps-3 text-center" style="width: 5%">ลำดับ</th>
                                     <th class="text-center" style="width: 10%">กลุ่มงาน</th>
-                                    <th style="width: 33%">รายละเอียดโครงการ / กิจกรรม</th>
-                                    <th class="text-center" style="width: 12%">ระยะเวลา</th>
-                                    <th class="text-end" style="width: 10%">อนุมัติตามแผน</th>
-                                    <th class="text-end" style="width: 10%">จัดสรร</th>
-                                    <th class="text-end" style="width: 10%">เบิกจ่าย</th>
-                                    <th class="text-end" style="width: 10%">คงเหลือ</th>
+                                    <th style="width: 52%">รายละเอียดโครงการ / กิจกรรม</th>
+                                    <th class="text-end" style="width: 11%">จัดสรร</th>
+                                    <th class="text-end" style="width: 11%">เบิกจ่าย</th>
+                                    <th class="text-end" style="width: 11%">คงเหลือ</th>
                                 </tr>
                             </thead>
                             <tbody id="searchTableBody"></tbody>
@@ -529,58 +512,77 @@
             </div>
             <div class="card border-0 shadow-sm mb-4 sticky-filter-panel">
                 <div class="card-body bg-light rounded-3 py-3">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small">กรองตามกลุ่มงาน</label>
-                            <select class="form-select select2" id="yearlyDeptSelect" style="width: 100%;"></select>
+                    
+                    <div class="row g-2 mb-2">
+                        <div class="col-12 col-md-2">
+                            <input type="text" id="yearlyOrder" class="form-control form-control-sm" placeholder="ลำดับโครงการ...">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small">ประเภทงบ</label>
-                            <select class="form-select" id="yearlyType">
-                                <option value="">-- ทั้งหมด --</option>
-                                <option value="MOPH">สป.สธ.</option>
+                        <div class="col-12 col-md-2">
+                            <select id="yearlyDeptSelect" class="form-select form-select-sm" style="width: 100%;">
+                                <option value="">-- ทุกกลุ่มงาน --</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <select id="yearlyType" class="form-select form-select-sm">
+                                <option value="">-- ทุกประเภทงบ --</option>
+                                <option value="MOPH">งบ สป.สธ.</option>
                                 <option value="NONMOPH">เงินนอก สป.</option>
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label fw-bold small">ไตรมาส</label>
-                            <select class="form-select" id="yearlyQuarter">
-                                <option value="">-- ทั้งหมด --</option>
-                                <option value="Q1">ไตรมาส 1</option>
-                                <option value="Q2">ไตรมาส 2</option>
-                                <option value="Q3">ไตรมาส 3</option>
-                                <option value="Q4">ไตรมาส 4</option>
+                        <div class="col-12 col-md-2">
+                            <select id="yearlySource" class="form-select form-select-sm">
+                                <option value="">-- ทุกแหล่งงบ --</option>
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label fw-bold small">เดือน</label>
-                            <select class="form-select" id="yearlyMonth">
-                                <option value="">-- ทั้งหมด --</option>
-                                <option value="0">ตุลาคม</option>
-                                <option value="1">พฤศจิกายน</option>
-                                <option value="2">ธันวาคม</option>
-                                <option value="3">มกราคม</option>
-                                <option value="4">กุมภาพันธ์</option>
-                                <option value="5">มีนาคม</option>
-                                <option value="6">เมษายน</option>
-                                <option value="7">พฤษภาคม</option>
-                                <option value="8">มิถุนายน</option>
-                                <option value="9">กรกฎาคม</option>
-                                <option value="10">สิงหาคม</option>
-                                <option value="11">กันยายน</option>
+                        <div class="col-12 col-md-2">
+                            <select id="yearlyBudgetCode" class="form-select form-select-sm" style="width: 100%;">
+                                <option value="">-- ทุกรหัสงบประมาณ --</option>
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <div class="d-flex gap-1">
-                                <button class="btn btn-success w-100" onclick="loadYearlyData()">
-                                  <i class="fas fa-search"></i>
-                                </button>
-                                <button class="btn btn-secondary w-100" onclick="resetYearly()">
-                                  <i class="fas fa-refresh"></i>
-                                </button>
-                            </div>
+                        <div class="col-12 col-md-2">
+                            <select id="yearlyActCode" class="form-select form-select-sm" style="width: 100%;">
+                                <option value="">-- ทุกรหัสกิจกรรม --</option>
+                            </select>
                         </div>
                     </div>
+
+                    <div class="row g-2 mb-2 align-items-center">
+                        <div class="col-12 col-md-3">
+                            <select id="yearlyQuarter" class="form-select form-select-sm">
+                                <option value="">-- ทุกไตรมาส --</option>
+                                <option value="Q1">ไตรมาส 1 (ต.ค.-ธ.ค.)</option>
+                                <option value="Q2">ไตรมาส 2 (ม.ค.-มี.ค.)</option>
+                                <option value="Q3">ไตรมาส 3 (เม.ย.-มิ.ย.)</option>
+                                <option value="Q4">ไตรมาส 4 (ก.ค.-ก.ย.)</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <select id="yearlyMonth" class="form-select form-select-sm">
+                                <option value="">-- ทุกเดือน --</option>
+                                <option value="0">ต.ค.</option>
+                                <option value="1">พ.ย.</option>
+                                <option value="2">ธ.ค.</option>
+                                <option value="3">ม.ค.</option>
+                                <option value="4">ก.พ.</option>
+                                <option value="5">มี.ค.</option>
+                                <option value="6">เม.ย.</option>
+                                <option value="7">พ.ค.</option>
+                                <option value="8">มิ.ย.</option>
+                                <option value="9">ก.ค.</option>
+                                <option value="10">ส.ค.</option>
+                                <option value="11">ก.ย.</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6 d-flex gap-2 justify-content-md-end">
+                            <button type="button" class="btn btn-primary btn-sm px-4 fw-bold shadow-sm" onclick="loadYearlyData()">
+                                <i class="fas fa-search me-2"></i>ค้นหาแผนงาน
+                            </button>
+                            <button type="button" class="btn btn-light btn-sm px-3 text-muted border shadow-sm" onclick="resetYearly()">
+                                <i class="fas fa-sync-alt me-2"></i>รีเซต
+                            </button>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
@@ -606,16 +608,14 @@
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table id="yearlyTable" class="table table-hover align-middle mb-0 w-100">
-                            <thead class="bg-light">
+                            <thead class="bg-dark text-white">
                                 <tr>
-                                    <th class="ps-3">ลำดับ</th>
-                                    <th>กลุ่มงาน</th>
-                                    <th>โครงการ/กิจกรรม</th>
-                                    <th>ประเภทงบ/แหล่งงบ</th>
-                                    <th class="text-center">ระยะเวลา</th>
-                                    <th class="text-end">จัดสรร</th>
-                                    <th class="text-end">เบิกจ่าย</th>
-                                    <th class="text-end pe-3">คงเหลือ</th>
+                                    <th class="ps-3 text-center" style="width: 5%">ลำดับ</th>
+                                    <th class="text-center" style="width: 10%">กลุ่มงาน</th>
+                                    <th style="width: 52%">รายละเอียดโครงการ / กิจกรรม</th>
+                                    <th class="text-end" style="width: 11%">จัดสรร</th>
+                                    <th class="text-end" style="width: 11%">เบิกจ่าย</th>
+                                    <th class="text-end" style="width: 11%">คงเหลือ</th>
                                 </tr>
                             </thead>
                             <tbody id="yearlyTableBody"></tbody>
